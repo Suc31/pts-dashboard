@@ -479,9 +479,11 @@ async function loadAllSheets() {
     sheetsConnected = true;
     renderRoster();
     updateOverviewMetrics();
+    handleURLRouting();
   } catch(e) {
     console.error('PTS Sheets load error:', e.message, e);
     renderSampleData();
+    handleURLRouting();
   }
 }
 
@@ -1205,7 +1207,7 @@ async function init() {
   document.getElementById('overview-date').textContent =
     `Week of ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`;
   await loadAllSheets();
-  handleURLRouting();
+  // handleURLRouting is called inside loadAllSheets after data is ready
 }
 
 init();
