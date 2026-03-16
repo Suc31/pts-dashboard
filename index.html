@@ -1056,7 +1056,7 @@ function renderSampleData() {
 
 function setView(v) {
   document.getElementById('coach-app').style.display = v === 'coach' ? '' : 'none';
-  document.getElementById('athlete-app').style.display = v === 'athlete' ? '' : 'none';
+  document.getElementById('athlete-app').style.display = v === 'athlete' ? 'block' : 'none';
   document.querySelectorAll('.view-btn').forEach(b => {
     b.classList.toggle('active', b.textContent.toLowerCase().includes(v === 'coach' ? 'coach' : 'athlete'));
   });
