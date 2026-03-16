@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTS Athlete Dashboard</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --pts-green: #0c7d47;
+  --pts-green-dark: #01502a;
+  --pts-green-mid: #2ab070;
+  --pts-green-light: #e8f5ee;
+  --pts-green-border: #a8d9be;
+  --pts-orange: #E8572A;
+  --pts-orange-light: #fdf0eb;
+  --pts-orange-border: #f5c4b0;
+  --pts-black: #000000;
+  --pts-charcoal: #111111;
+  --color-bg: #f5f5f5;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-text-primary: #111111;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #999999;
+  --color-border: rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.2);
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--color-bg); min-height: 100vh; }
+
+/* TOPBAR */
+.topbar { background: var(--pts-black); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 100; }
+.topbar-brand { display: flex; align-items: center; gap: 10px; }
+.brand-words { line-height: 1.2; }
+.brand-main { font-size: 12px; font-weight: 600; color: white; letter-spacing: 1.6px; text-transform: uppercase; }
+.brand-sub { font-size: 9px; color: var(--pts-green-mid); letter-spacing: 1.2px; text-transform: uppercase; }
+.view-toggle { display: flex; gap: 3px; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 3px; }
+.view-btn { padding: 5px 14px; border: none; background: none; border-radius: 4px; font-size: 12px; cursor: pointer; color: rgba(255,255,255,0.4); font-family: inherit; transition: all 0.15s; }
+.view-btn.active { background: var(--pts-green); color: white; font-weight: 600; }
+.coach-id { font-size: 10px; color: rgba(255,255,255,0.28); letter-spacing: 1px; text-transform: uppercase; }
+
+/* LAYOUT */
+.layout { display: grid; grid-template-columns: 212px 1fr; min-height: calc(100vh - 52px); }
+.sidebar { background: var(--pts-charcoal); padding: 14px 0; position: sticky; top: 52px; height: calc(100vh - 52px); overflow-y: auto; }
+.sb-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.22); text-transform: uppercase; letter-spacing: 1px; padding: 0 14px; margin-bottom: 6px; }
+.sb-section { margin-bottom: 20px; }
+.sb-search { padding: 0 10px; margin-bottom: 8px; }
+.sb-search input { width: 100%; background: rgba(255,255,255,0.07); border: 0.5px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 6px 10px; font-size: 11px; color: rgba(255,255,255,0.7); font-family: inherit; outline: none; }
+.sb-search input::placeholder { color: rgba(255,255,255,0.25); }
+.sb-search input:focus { border-color: var(--pts-green); }
+.ath-card { display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 12px; cursor: pointer; margin: 1px 6px; border-radius: 6px; border-left: 2px solid transparent; transition: background 0.12s; }
+.ath-card:hover { background: rgba(255,255,255,0.06); }
+.ath-card.active { background: rgba(12,125,71,0.2); border-left-color: var(--pts-orange); }
+.av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.ath-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.82); }
+.ath-meta { font-size: 10px; color: rgba(255,255,255,0.3); }
+.dot { width: 5px; height: 5px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+.dot-g { background: var(--pts-green-mid); }
+.dot-o { background: var(--pts-orange); }
+.dot-x { background: #444; }
+.sb-btn { display: block; width: calc(100% - 12px); margin: 2px 6px; padding: 7px 10px; background: none; border: 0.5px solid rgba(255,255,255,0.1); border-radius: 6px; color: rgba(255,255,255,0.42); font-size: 12px; cursor: pointer; text-align: left; font-family: inherit; transition: all 0.12s; }
+.sb-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+.sb-btn.primary { background: var(--pts-green); border-color: var(--pts-green); color: white; text-align: center; font-weight: 600; }
+.sb-btn.primary:hover { background: var(--pts-green-dark); }
+
+/* MAIN */
+.main { padding: 20px; overflow-y: auto; }
+.page { display: none; }
+.page.active { display: block; }
+.ph { margin-bottom: 16px; display: flex; align-items: flex-start; justify-content: space-between; }
+.pt { font-size: 18px; font-weight: 600; color: var(--color-text-primary); }
+.ps { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+
+.mgrid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
+.mc { background: var(--color-bg-primary); border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; }
+.mc.accent { border-top: 2px solid var(--pts-orange); }
+.ml { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 3px; }
+.mv { font-size: 22px; font-weight: 600; color: var(--color-text-primary); line-height: 1; }
+.ms { font-size: 11px; color: var(--color-text-secondary); margin-top: 3px; }
+
+.card { background: var(--color-bg-primary); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 14px; }
+.ct { font-size: 13px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+
+.rrow { display: grid; grid-template-columns: 1fr 120px 55px 82px 78px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 0.5px solid var(--color-border); font-size: 12px; cursor: pointer; }
+.rrow:hover:not(.rh) { background: var(--color-bg-secondary); border-radius: 4px; padding: 9px 4px; margin: 0 -4px; }
+.rrow:last-child { border-bottom: none; }
+.rh { font-size: 10px; color: var(--color-text-secondary); font-weight: 600; cursor: default; }
+
+.bdg { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.bdg-g { background: var(--pts-green-light); color: var(--pts-green-dark); }
+.bdg-o { background: var(--pts-orange-light); color: #9b3518; }
+.bdg-x { background: #F1EFE8; color: #5F5E5A; }
+
+.tabs { display: flex; border-bottom: 0.5px solid var(--color-border); margin-bottom: 14px; }
+.tab { padding: 7px 14px; font-size: 12px; cursor: pointer; color: var(--color-text-secondary); border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; transition: all 0.12s; }
+.tab.active { color: var(--pts-green); border-bottom-color: var(--pts-green); font-weight: 600; }
+.tc { display: none; }
+.tc.active { display: block; }
+
+.sh { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.wkbdg { background: var(--pts-green); color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.sdate { font-size: 12px; color: var(--color-text-secondary); }
+
+.exblock { border: 0.5px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 8px; overflow: hidden; }
+.exname { background: var(--pts-black); padding: 9px 12px; font-size: 12px; font-weight: 600; color: white; display: flex; align-items: center; justify-content: space-between; }
+.excue { padding: 9px 12px; font-size: 11px; color: var(--color-text-secondary); line-height: 1.6; background: var(--color-bg-secondary); }
+.exlog { padding: 10px 12px; border-top: 0.5px solid var(--color-border); display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.lf { display: flex; flex-direction: column; gap: 3px; }
+.ll { font-size: 10px; color: var(--color-text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.li { border: 0.5px solid var(--color-border-secondary); border-radius: 6px; padding: 6px 8px; font-size: 12px; background: var(--color-bg-primary); color: var(--color-text-primary); width: 100%; font-family: inherit; }
+.li:focus { outline: none; border-color: var(--pts-green); box-shadow: 0 0 0 2px rgba(12,125,71,0.1); }
+.sstag { font-size: 10px; font-weight: 600; color: var(--pts-orange); background: var(--pts-orange-light); padding: 1px 6px; border-radius: 3px; }
+.refl { width: 100%; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); padding: 9px 11px; font-size: 12px; font-family: inherit; color: var(--color-text-primary); background: var(--color-bg-primary); resize: vertical; min-height: 70px; margin-top: 10px; }
+.refl:focus { outline: none; border-color: var(--pts-green); }
+.slabel { font-size: 10px; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.8px; margin: 14px 0 8px; }
+
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: var(--radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.12s; font-family: inherit; }
+.btn:hover { background: var(--color-bg-secondary); }
+.btn-g { background: var(--pts-green); color: white; border-color: var(--pts-green); }
+.btn-g:hover { background: var(--pts-green-dark); }
+.btn-o { background: var(--pts-orange); color: white; border-color: var(--pts-orange); }
+.btn-o:hover { background: #c94820; }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.savebar { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 0.5px solid var(--color-border); margin-top: 8px; }
+.savestatus { font-size: 11px; color: var(--color-text-secondary); }
+
+.hrow { display: grid; grid-template-columns: 75px 1fr 50px 65px; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--color-border); font-size: 11px; align-items: start; }
+.hrow:last-child { border-bottom: none; }
+.exi { color: var(--color-text-primary); margin-bottom: 2px; }
+
+.pbar { height: 3px; background: var(--color-bg-secondary); border-radius: 2px; margin-top: 4px; }
+.pfill { height: 100%; background: var(--pts-green); border-radius: 2px; }
+.twocol { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 14px; }
+
+.aichat { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.aimsg { display: flex; gap: 8px; }
+.aiav { width: 26px; height: 26px; border-radius: 50%; background: var(--pts-green-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; font-weight: 600; color: var(--pts-green-dark); }
+.aibub { background: var(--color-bg-secondary); border-radius: var(--radius-md); padding: 9px 12px; font-size: 12px; color: var(--color-text-primary); line-height: 1.6; max-width: calc(100% - 36px); }
+.umsg { justify-content: flex-end; }
+.ubub { background: var(--pts-green-light); border-radius: var(--radius-md); padding: 9px 12px; font-size: 12px; color: var(--pts-green-dark); line-height: 1.6; max-width: 80%; }
+.airow { display: flex; gap: 8px; margin-top: 10px; }
+.aiinput { flex: 1; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); padding: 8px 11px; font-size: 12px; font-family: inherit; color: var(--color-text-primary); background: var(--color-bg-primary); }
+.aiinput:focus { outline: none; border-color: var(--pts-green); }
+.qps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.cnote { width: 100%; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); padding: 8px 10px; font-size: 12px; font-family: inherit; color: var(--color-text-primary); background: var(--color-bg-primary); resize: none; min-height: 60px; }
+.cnote:focus { outline: none; border-color: var(--pts-green); }
+.cbanner { background: var(--pts-green-light); border: 0.5px solid var(--pts-green-border); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 14px; }
+.cbanner input { width: 100%; border: 0.5px solid var(--pts-green-border); border-radius: 6px; padding: 6px 10px; font-size: 12px; font-family: inherit; background: white; color: var(--color-text-primary); margin-top: 8px; }
+.cbanner input:focus { outline: none; border-color: var(--pts-green); }
+
+/* loading / empty states */
+.state-msg { padding: 32px; text-align: center; color: var(--color-text-tertiary); font-size: 12px; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--pts-green-border); border-top-color: var(--pts-green); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ATHLETE VIEW */
+#athlete-app { display: none; }
+.athtopbar { background: #000; padding: 0 20px; height: 50px; display: flex; align-items: center; justify-content: space-between; }
+.athbody { padding: 16px 20px; max-width: 620px; margin: 0 auto; }
+.athgreet-name { font-size: 20px; font-weight: 600; color: #111; }
+.athgreet-sub { font-size: 12px; color: #666; margin-top: 2px; margin-bottom: 16px; }
+.athcard { background: white; border: 1px solid #e8e8e8; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+.athcard-hdr { background: #000; padding: 11px 16px; display: flex; align-items: center; gap: 10px; }
+.athwk { background: var(--pts-green); color: white; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.5px; }
+.athsname { font-size: 13px; font-weight: 600; color: white; }
+.athex { border-bottom: 1px solid #f0f0f0; }
+.athex:last-child { border-bottom: none; }
+.athex-name { padding: 11px 16px 3px; font-size: 13px; font-weight: 600; color: #111; display: flex; align-items: center; gap: 8px; }
+.athex-cue { padding: 0 16px 8px; font-size: 11px; color: #666; line-height: 1.6; }
+.athlog { padding: 8px 16px 12px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; background: #fafafa; border-top: 1px solid #f0f0f0; }
+.alf { display: flex; flex-direction: column; gap: 3px; }
+.all { font-size: 9px; color: #999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+.ali { border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; font-size: 12px; background: white; color: #111; width: 100%; font-family: inherit; }
+.ali:focus { outline: none; border-color: var(--pts-green); box-shadow: 0 0 0 2px rgba(12,125,71,0.1); }
+.athss { font-size: 9px; background: var(--pts-orange-light); color: #9b3518; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+.athrefl-card { background: white; border: 1px solid #e8e8e8; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+.athrefl-lbl { font-size: 11px; font-weight: 600; color: #111; margin-bottom: 8px; }
+.athrefl { width: 100%; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; font-size: 12px; font-family: inherit; color: #111; background: white; resize: vertical; min-height: 70px; }
+.athrefl:focus { outline: none; border-color: var(--pts-green); }
+.athsave { width: 100%; padding: 14px; background: var(--pts-green); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.12s; }
+.athsave:hover { background: var(--pts-green-dark); }
+</style>
+</head>
+<body>
+
+<!-- ===== COACH APP ===== -->
+<div id="coach-app">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <svg width="34" height="34" viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="17" fill="none" stroke="#E8572A" stroke-width="3"/>
+        <circle cx="18" cy="18" r="13" fill="white"/>
+        <path d="M18 6 L21 16 L18 13 L15 16 Z" fill="#0c7d47"/>
+        <path d="M18 30 L15 20 L18 23 L21 20 Z" fill="#0c7d47"/>
+        <path d="M6 18 L16 15 L13 18 L16 21 Z" fill="#0c7d47"/>
+        <path d="M30 18 L20 21 L23 18 L20 15 Z" fill="#0c7d47"/>
+        <circle cx="18" cy="18" r="3" fill="#0c7d47"/>
+      </svg>
+      <div class="brand-words">
+        <div class="brand-main">Prototype Training Systems</div>
+        <div class="brand-sub">Athlete Dashboard · Coach View</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="coach-id">Steve Cimino</span>
+      <div class="view-toggle">
+        <button class="view-btn active" onclick="setView('coach')">Coach</button>
+        <button class="view-btn" onclick="setView('athlete')">Athlete preview</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sb-section">
+        <div class="sb-label">Athletes</div>
+        <div class="sb-search">
+          <input id="ath-search" placeholder="Search athletes..." oninput="filterAthletes(this.value)" />
+        </div>
+        <div id="ath-list">
+          <div class="state-msg"><span class="spinner"></span>Loading...</div>
+        </div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Navigation</div>
+        <button class="sb-btn" onclick="showPg('overview')">Overview</button>
+        <button class="sb-btn" onclick="showPg('ai')">AI coach</button>
+        <button class="sb-btn primary">+ Add athlete</button>
+      </div>
+    </div>
+
+    <div class="main">
+
+      <!-- OVERVIEW -->
+      <div id="pg-overview" class="page active">
+        <div class="ph">
+          <div><div class="pt">Overview</div><div class="ps" id="overview-date">Loading...</div></div>
+          <button class="btn btn-sm btn-o">Weekly report</button>
+        </div>
+        <div class="mgrid">
+          <div class="mc accent"><div class="ml">Active athletes</div><div class="mv" id="m-active">—</div><div class="ms" id="m-active-sub">Loading roster</div></div>
+          <div class="mc"><div class="ml">Sessions this week</div><div class="mv" id="m-sessions">—</div><div class="ms">Across all athletes</div></div>
+          <div class="mc"><div class="ml">Logs to review</div><div class="mv" id="m-logs">—</div><div class="ms" id="m-logs-sub">From session logs</div></div>
+          <div class="mc"><div class="ml">AI progressions</div><div class="mv">—</div><div class="ms">Connect AI to activate</div></div>
+        </div>
+        <div class="card">
+          <div class="ct">Athlete roster</div>
+          <div class="rrow rh"><div>Athlete</div><div>Block</div><div>Week</div><div>Status</div><div>Last session</div></div>
+          <div id="roster-rows"><div class="state-msg"><span class="spinner"></span>Loading athletes...</div></div>
+        </div>
+        <div class="cbanner">
+          <div style="font-size:12px;font-weight:600;color:var(--pts-green-dark);margin-bottom:3px;">Connect Google Sheets to go live</div>
+          <div style="font-size:11px;color:var(--pts-green);line-height:1.5;">Paste your published Sheet URL — workouts and session logs sync automatically. Athletes tab needs: Name, Block name, Start date, Notes.</div>
+          <input placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/pub?output=csv" id="sheetsUrl" />
+          <div style="display:flex;gap:7px;margin-top:8px;">
+            <button class="btn btn-sm btn-g" onclick="connectSheets()">Connect &amp; Load</button>
+            <button class="btn btn-sm" onclick="showSetupGuide()">Setup guide</button>
+          </div>
+          <div id="sheets-status" style="font-size:11px;margin-top:8px;display:none;"></div>
+        </div>
+      </div>
+
+      <!-- ATHLETE DETAIL -->
+      <div id="pg-athlete" class="page">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div class="av" id="det-av" style="width:40px;height:40px;font-size:14px;background:rgba(12,125,71,0.15);color:var(--pts-green);">—</div>
+          <div>
+            <div class="pt" id="det-name">Select an athlete</div>
+            <div class="ps" id="det-meta"></div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:7px;">
+            <div id="det-week-badge" style="display:none;"></div>
+            <button class="btn btn-sm btn-o" onclick="showPg('ai')">AI progression ↗</button>
+          </div>
+        </div>
+        <div class="tabs">
+          <button class="tab active" id="t-sess" onclick="showTab('sess')">Today's session</button>
+          <button class="tab" id="t-hist" onclick="showTab('hist')">History</button>
+          <button class="tab" id="t-prog" onclick="showTab('prog')">Progress</button>
+          <button class="tab" id="t-note" onclick="showTab('note')">Coach notes</button>
+        </div>
+
+        <div id="tc-sess" class="tc active">
+          <div id="sess-content"><div class="state-msg">Select an athlete to view their session.</div></div>
+        </div>
+
+        <div id="tc-hist" class="tc">
+          <div id="hist-content"><div class="state-msg">No session history loaded.</div></div>
+        </div>
+
+        <div id="tc-prog" class="tc">
+          <div id="prog-content"><div class="state-msg">Progress data will appear here once sessions are logged.</div></div>
+        </div>
+
+        <div id="tc-note" class="tc">
+          <div id="note-content">
+            <div class="card">
+              <div class="ct">Coach notes — <span id="note-athlete-name">—</span></div>
+              <div id="note-list" style="margin-bottom:12px;"></div>
+              <textarea class="cnote" id="new-note-text" placeholder="Add a note..."></textarea>
+              <div style="display:flex;justify-content:flex-end;margin-top:8px;"><button class="btn btn-sm btn-g" onclick="saveNote()">Save note</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI COACH -->
+      <div id="pg-ai" class="page">
+        <div class="ph"><div><div class="pt">AI coach</div><div class="ps">Powered by Claude · progressions, programming, real-time answers</div></div></div>
+        <div class="card">
+          <div class="qps" id="ai-qps">
+            <button class="btn btn-sm" onclick="askAI('Suggest next week progressions based on recent sessions')">Progressions ↗</button>
+            <button class="btn btn-sm" onclick="askAI('Generate a new 4-week program block for the current athlete')">Generate program ↗</button>
+            <button class="btn btn-sm" onclick="askAI('Athlete missed last session — how should I adjust this week?')">Missed session ↗</button>
+            <button class="btn btn-sm" onclick="askAI('What are appropriate loading parameters for in-season maintenance?')">In-season load ↗</button>
+          </div>
+          <div class="aichat" id="aichat">
+            <div class="aimsg"><div class="aiav">AI</div><div class="aibub">Hi Steve — I have context on your athletes. Ask me about progressions, programming, loading adjustments, or real-time session questions.</div></div>
+          </div>
+          <div class="airow">
+            <input class="aiinput" id="aiinput" placeholder="Ask about any athlete, progression, or workout..." onkeydown="if(event.key==='Enter')sendAI()"/>
+            <button class="btn btn-g btn-sm" onclick="sendAI()">Send</button>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:12px 14px;background:var(--pts-green-light);border:0.5px solid var(--pts-green-border);border-radius:var(--radius-md);">
+          <div style="font-size:11px;font-weight:600;color:var(--pts-green-dark);margin-bottom:4px;">API key required</div>
+          <div style="font-size:11px;color:var(--pts-green);">To activate the AI coach, add your Anthropic API key to the ANTHROPIC_API_KEY variable at the top of the script section.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== ATHLETE APP ===== -->
+<div id="athlete-app">
+  <div class="athtopbar">
+    <div style="display:flex;align-items:center;gap:9px;">
+      <svg width="28" height="28" viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="17" fill="none" stroke="#E8572A" stroke-width="3"/>
+        <circle cx="18" cy="18" r="13" fill="white"/>
+        <path d="M18 6 L21 16 L18 13 L15 16 Z" fill="#0c7d47"/>
+        <path d="M18 30 L15 20 L18 23 L21 20 Z" fill="#0c7d47"/>
+        <path d="M6 18 L16 15 L13 18 L16 21 Z" fill="#0c7d47"/>
+        <path d="M30 18 L20 21 L23 18 L20 15 Z" fill="#0c7d47"/>
+        <circle cx="18" cy="18" r="3" fill="#0c7d47"/>
+      </svg>
+      <div style="font-size:10px;font-weight:600;color:white;letter-spacing:1.8px;text-transform:uppercase;">Prototype <span style="color:#2ab070;">Training</span></div>
+    </div>
+    <button onclick="setView('coach')" style="font-size:11px;color:rgba(255,255,255,0.4);background:none;border:none;cursor:pointer;">← Coach view</button>
+  </div>
+  <div class="athbody" id="ath-portal-body">
+    <div class="state-msg">Loading athlete session...</div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// CONFIG — add your keys here
+// ════════════════════════════════════════════
+const ANTHROPIC_API_KEY = '';
+
+// Paste your published Google Sheets CSV URLs here after setup
+// Format: File → Share → Publish to web → select tab → CSV → copy URL
+const SHEET_URLS = {
+  athletes: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR7f6Ap6_NRwBzUaBEFlSQw12EBQlhexAzt0mZdKOgBzU_p5m242Z6UqMV6Hk2j9DckjR6BjrAZHVXR/pub?gid=0&single=true&output=csv',
+  workouts: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR7f6Ap6_NRwBzUaBEFlSQw12EBQlhexAzt0mZdKOgBzU_p5m242Z6UqMV6Hk2j9DckjR6BjrAZHVXR/pub?gid=1865221503&single=true&output=csv',
+  logs:     'https://docs.google.com/spreadsheets/d/e/2PACX-1vR7f6Ap6_NRwBzUaBEFlSQw12EBQlhexAzt0mZdKOgBzU_p5m242Z6UqMV6Hk2j9DckjR6BjrAZHVXR/pub?gid=381735388&single=true&output=csv',
+  notes:    'https://docs.google.com/spreadsheets/d/e/2PACX-1vR7f6Ap6_NRwBzUaBEFlSQw12EBQlhexAzt0mZdKOgBzU_p5m242Z6UqMV6Hk2j9DckjR6BjrAZHVXR/pub?gid=953697473&single=true&output=csv'
+};
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let DB = {
+  athletes: [],     // [{name, blockName, startDate, notes}]
+  workouts: [],     // [{blockName, week, day, sessionName, exercise, sets, reps, load, rest, tempo, cue}]
+  logs: [],         // [{athlete, date, week, day, exercise, weight, repsDone, rpe, note, reflection}]
+  coachNotes: []    // [{athlete, date, note, action}]
+};
+let currentAthlete = null;
+let sheetsConnected = false;
+
+// ════════════════════════════════════════════
+// GOOGLE SHEETS — CSV FETCH & PARSE
+// ════════════════════════════════════════════
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  return lines.slice(1).map(line => {
+    // Handle quoted fields with commas inside
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else { cur += line[i]; }
+    }
+    fields.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (fields[i] || '').replace(/^"|"$/g, ''); });
+    return obj;
+  }).filter(row => Object.values(row).some(v => v !== ''));
+}
+
+async function fetchSheet(url) {
+  if (!url) return null;
+  // Convert regular Sheets URL to CSV export URL if needed
+  const csvUrl = url.includes('/pub?') ? url : 
+    url.replace('/edit', '/pub').replace(/\/pub$/, '/pub?output=csv') + (url.includes('?') ? '&output=csv' : '?output=csv');
+  const resp = await fetch(csvUrl);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return parseCSV(await resp.text());
+}
+
+async function loadAllSheets() {
+  const urls = SHEET_URLS;
+  const hasAny = Object.values(urls).some(u => u);
+  if (!hasAny) {
+    renderSampleData();
+    return;
+  }
+  try {
+    console.log('PTS: Fetching all sheets...');
+    const [athletes, workouts, logs, notes] = await Promise.all([
+      fetchSheet(urls.athletes),
+      fetchSheet(urls.workouts),
+      fetchSheet(urls.logs),
+      fetchSheet(urls.notes)
+    ]);
+    console.log('PTS: Athletes:', athletes?.length, '| Workouts:', workouts?.length, '| Logs:', logs?.length);
+    if (workouts?.length) console.log('PTS: First workout row:', JSON.stringify(workouts[0]));
+    if (athletes) DB.athletes = athletes.map(r => ({
+      name: r['Name'] || r['name'] || '',
+      blockName: r['Block name'] || r['block_name'] || '',
+      startDate: r['Start date'] || r['start_date'] || '',
+      notes: r['Notes'] || r['notes'] || '',
+      progressionRules: r['Progression rules'] || r['progression_rules'] || ''
+    })).filter(a => a.name);
+
+    if (workouts) DB.workouts = workouts.map(r => ({
+      athleteName: r['Athlete name'] || r['Athlete'] || '',
+      week: parseInt(r['Week']) || 1,
+      day: parseInt(r['Day']) || 1,
+      sessionName: r['Session name'] || '',
+      exercise: r['Exercise'] || '',
+      sets: r['Sets'] || '',
+      reps: r['Reps'] || '',
+      load: r['Load'] || '',
+      rest: r['Rest'] || '',
+      tempo: r['Tempo'] || '',
+      cue: r['Cue'] || ''
+    })).filter(w => w.exercise);
+
+    if (logs) DB.logs = logs.map(r => ({
+      athlete: r['Athlete'] || '',
+      date: r['Date'] || '',
+      week: parseInt(r['Week']) || 0,
+      day: parseInt(r['Day']) || 0,
+      exercise: r['Exercise'] || '',
+      weight: r['Weight'] || '',
+      repsDone: r['Reps done'] || '',
+      rpe: r['RPE'] || '',
+      note: r['Note'] || '',
+      reflection: r['Workout reflection'] || ''
+    }));
+
+    if (notes) DB.coachNotes = notes.map(r => ({
+      athlete: r['Athlete'] || '',
+      date: r['Date'] || '',
+      note: r['Note'] || '',
+      action: r['Action'] || ''
+    }));
+
+    sheetsConnected = true;
+    renderRoster();
+    updateOverviewMetrics();
+  } catch(e) {
+    console.error('PTS Sheets load error:', e.message, e);
+    renderSampleData();
+  }
+}
+
+// ════════════════════════════════════════════
+// DAY CALCULATION — derived from Workouts tab
+// ════════════════════════════════════════════
+
+function getAthleteCurrentWeekDay(athlete) {
+  const blockWorkouts = DB.workouts.filter(w => w.athleteName === athlete.name);
+  if (!blockWorkouts.length) return { week: 1, day: 1, totalDays: 1 };
+
+  // Get unique day numbers for this block
+  const uniqueDays = [...new Set(blockWorkouts.map(w => w.day))].sort((a,b) => a-b);
+  const totalDays = uniqueDays.length;
+
+  // Parse start date
+  const startDate = new Date(athlete.startDate);
+  if (isNaN(startDate)) return { week: 1, day: 1, totalDays };
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  startDate.setHours(0,0,0,0);
+
+  // Count calendar days elapsed
+  const msPerDay = 86400000;
+  const daysElapsed = Math.max(0, Math.floor((today - startDate) / msPerDay));
+
+  // Map elapsed days to program days (skip weekends only if needed — for now linear)
+  // totalDays per week = training frequency derived from workouts
+  const weeksElapsed = Math.floor(daysElapsed / 7);
+  const remainingDays = daysElapsed % 7;
+
+  // Determine how many training sessions fit in a week
+  // We space training days evenly across the week
+  const daysPerWeek = totalDays <= 4 ? totalDays : 4;
+  const sessionInterval = Math.floor(7 / daysPerWeek);
+  const sessionsElapsed = Math.floor(daysElapsed / sessionInterval);
+
+  const week = Math.floor(sessionsElapsed / totalDays) + 1;
+  const dayIndex = sessionsElapsed % totalDays;
+  const day = uniqueDays[dayIndex] || 1;
+
+  return { week, day, totalDays, uniqueDays };
+}
+
+// ════════════════════════════════════════════
+// RENDER — ROSTER & SIDEBAR
+// ════════════════════════════════════════════
+
+function avatarColors(index) {
+  const palettes = [
+    { bg: 'rgba(12,125,71,0.15)', color: '#0c7d47' },
+    { bg: 'rgba(232,87,42,0.12)', color: '#c94820' },
+    { bg: 'rgba(42,176,112,0.15)', color: '#1a8a56' },
+    { bg: 'rgba(1,80,42,0.2)', color: '#5DCAA5' },
+    { bg: 'rgba(12,125,71,0.25)', color: '#2ab070' },
+    { bg: 'rgba(232,87,42,0.2)', color: '#E8572A' },
+  ];
+  return palettes[index % palettes.length];
+}
+
+function initials(name) {
+  return name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0,2);
+}
+
+function renderRoster(filter = '') {
+  const filtered = DB.athletes.filter(a =>
+    !filter || a.name.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  // Sidebar
+  const list = document.getElementById('ath-list');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="state-msg" style="color:rgba(255,255,255,0.3);font-size:11px;">No athletes found</div>';
+  } else {
+    list.innerHTML = filtered.map((a, i) => {
+      const { week, day } = getAthleteCurrentWeekDay(a);
+      const pal = avatarColors(DB.athletes.indexOf(a));
+      const isActive = currentAthlete && currentAthlete.name === a.name;
+      return `<div class="ath-card ${isActive ? 'active' : ''}" onclick="selectAthlete('${a.name.replace(/'/g,"\\'")}')">
+        <div class="av" style="background:${pal.bg};color:${pal.color};">${initials(a.name)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="ath-name">${a.name}</div>
+          <div class="ath-meta">W${week} D${day} · ${a.notes.split(',')[0].trim().slice(0,20)}</div>
+        </div>
+        <div class="dot dot-g"></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Overview roster table
+  const rows = document.getElementById('roster-rows');
+  if (rows) {
+    if (!DB.athletes.length) {
+      rows.innerHTML = '<div class="state-msg">Connect Google Sheets to load your roster.</div>';
+    } else {
+      rows.innerHTML = filtered.map(a => {
+        const { week, day } = getAthleteCurrentWeekDay(a);
+        const athLogs = DB.logs.filter(l => l.athlete === a.name);
+        const lastLog = athLogs.sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+        const lastDate = lastLog ? lastLog.date : '—';
+        return `<div class="rrow" onclick="selectAthlete('${a.name.replace(/'/g,"\\'")}')">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div class="av" style="width:24px;height:24px;font-size:9px;background:${avatarColors(DB.athletes.indexOf(a)).bg};color:${avatarColors(DB.athletes.indexOf(a)).color};">${initials(a.name)}</div>
+            ${a.name}
+          </div>
+          <div style="color:var(--color-text-secondary);font-size:11px;">${a.blockName.slice(0,22)}</div>
+          <div>W${week} D${day}</div>
+          <div><span class="bdg bdg-g">On track</span></div>
+          <div style="color:var(--color-text-secondary);">${lastDate}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+function filterAthletes(val) {
+  renderRoster(val);
+}
+
+function updateOverviewMetrics() {
+  const today = new Date().toDateString();
+  document.getElementById('m-active').textContent = DB.athletes.length;
+  document.getElementById('m-active-sub').textContent = `${DB.athletes.length} in roster`;
+  const thisWeekLogs = DB.logs.filter(l => {
+    const d = new Date(l.date);
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    return d >= weekStart;
+  });
+  document.getElementById('m-sessions').textContent = thisWeekLogs.length || '—';
+  document.getElementById('m-logs').textContent = DB.logs.length || '—';
+  document.getElementById('m-logs-sub').textContent = `${DB.logs.length} total logged`;
+  document.getElementById('overview-date').textContent = `Week of ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`;
+}
+
+// ════════════════════════════════════════════
+// SELECT ATHLETE & RENDER SESSION
+// ════════════════════════════════════════════
+
+function selectAthlete(name) {
+  currentAthlete = DB.athletes.find(a => a.name === name);
+  if (!currentAthlete) return;
+
+  const { week, day } = getAthleteCurrentWeekDay(currentAthlete);
+  const pal = avatarColors(DB.athletes.indexOf(currentAthlete));
+
+  // Update header
+  const av = document.getElementById('det-av');
+  av.textContent = initials(name);
+  av.style.background = pal.bg;
+  av.style.color = pal.color;
+  document.getElementById('det-name').textContent = name;
+  document.getElementById('det-meta').textContent = `${currentAthlete.blockName} · ${currentAthlete.notes.slice(0,50)}`;
+
+  const wb = document.getElementById('det-week-badge');
+  wb.style.display = '';
+  wb.innerHTML = `<span class="wkbdg">Week ${week} · Day ${day}</span>`;
+
+  // Re-render sidebar active state
+  renderRoster(document.getElementById('ath-search').value);
+  showPg('athlete');
+  showTab('sess');
+  renderSession(week, day);
+  renderHistory();
+  renderProgress();
+  renderNotes();
+
+  // Update athlete portal preview
+  renderAthletePortal(week, day);
+}
+
+function renderSession(week, day) {
+  const exercises = DB.workouts.filter(w =>
+    w.athleteName === currentAthlete.name &&
+    w.week == week &&
+    w.day == day
+  );
+
+  const sessEl = document.getElementById('sess-content');
+  if (!exercises.length) {
+    sessEl.innerHTML = `<div class="state-msg">No workout found for Week ${week}, Day ${day} in block "${currentAthlete.blockName}".<br><br>Make sure the Workouts tab has data for this block.</div>`;
+    return;
+  }
+
+  const sessionName = exercises[0].sessionName;
+  const today = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+  const exHTML = exercises.map(ex => {
+    const isSuperset = ex.exercise.match(/^[A-Z]\d\s·/);
+    const supersetLetter = isSuperset ? ex.exercise[0] : null;
+    const cueText = [
+      ex.sets && ex.reps ? `${ex.sets} sets × ${ex.reps} reps` : '',
+      ex.load ? `· ${ex.load}` : '',
+      ex.rest ? `· Rest ${ex.rest}` : '',
+      ex.tempo ? `· Tempo ${ex.tempo}` : ''
+    ].filter(Boolean).join(' ');
+
+    return `<div class="exblock">
+      <div class="exname">
+        ${ex.exercise}
+        ${supersetLetter ? `<span class="sstag">Superset ${supersetLetter}</span>` : ''}
+      </div>
+      <div class="excue">${cueText}${ex.cue ? '<br>' + ex.cue : ''}</div>
+      <div class="exlog">
+        <div class="lf"><span class="ll">Weight / Load</span><input class="li" placeholder="${ex.load || '—'}" data-ex="${ex.exercise}" data-field="weight"/></div>
+        <div class="lf"><span class="ll">Reps done</span><input class="li" placeholder="${ex.reps || '—'}" data-ex="${ex.exercise}" data-field="reps"/></div>
+        <div class="lf"><span class="ll">RPE</span><input class="li" placeholder="1–10" data-ex="${ex.exercise}" data-field="rpe"/></div>
+        <div class="lf"><span class="ll">Note</span><input class="li" placeholder="Any flags..." data-ex="${ex.exercise}" data-field="note"/></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  sessEl.innerHTML = `
+    <div class="sh">
+      <span class="wkbdg">Week ${week} · Day ${day}</span>
+      <span class="sdate">${sessionName} · ${today}</span>
+    </div>
+    ${exHTML}
+    <div class="slabel">Workout reflection</div>
+    <textarea class="refl" id="sess-reflection" placeholder="How did the session feel overall? Energy, soreness, mental state, anything to flag..."></textarea>
+    <div class="savebar">
+      <span class="savestatus" id="sstat">Unsaved</span>
+      <div style="display:flex;gap:7px;">
+        <button class="btn btn-sm" onclick="showPg('ai')">AI progression ↗</button>
+        <button class="btn btn-sm btn-g" onclick="saveSess(${week}, ${day})">Save session log</button>
+      </div>
+    </div>`;
+}
+
+function renderHistory() {
+  if (!currentAthlete) return;
+  const athLogs = DB.logs
+    .filter(l => l.athlete === currentAthlete.name)
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const el = document.getElementById('hist-content');
+  if (!athLogs.length) {
+    el.innerHTML = '<div class="state-msg">No session logs yet for this athlete.</div>';
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  athLogs.forEach(l => {
+    if (!byDate[l.date]) byDate[l.date] = [];
+    byDate[l.date].push(l);
+  });
+
+  el.innerHTML = `<div style="display:grid;grid-template-columns:75px 1fr 50px 65px;gap:10px;font-size:10px;color:var(--color-text-secondary);font-weight:600;padding-bottom:6px;border-bottom:0.5px solid var(--color-border);">
+    <div>Date</div><div>Exercises</div><div>RPE</div><div>Status</div>
+  </div>` + Object.entries(byDate).slice(0,8).map(([date, entries]) => {
+    const avgRPE = (entries.reduce((s,e) => s + (parseFloat(e.rpe)||0), 0) / entries.filter(e=>e.rpe).length).toFixed(1);
+    return `<div class="hrow">
+      <div style="color:var(--color-text-secondary);padding-top:1px;">${date}</div>
+      <div>${entries.map(e => `<div class="exi">${e.exercise}${e.weight ? ' — ' + e.weight : ''}${e.repsDone ? ' × ' + e.repsDone : ''}</div>`).join('')}</div>
+      <div style="font-weight:600;">${isNaN(avgRPE) ? '—' : avgRPE}</div>
+      <div><span class="bdg bdg-g">Logged</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderProgress() {
+  if (!currentAthlete) return;
+  const logs = DB.logs.filter(l => l.athlete === currentAthlete.name && l.rpe);
+  const el = document.getElementById('prog-content');
+
+  if (!logs.length) {
+    el.innerHTML = '<div class="state-msg">No session data yet — progress charts will appear after first few sessions.</div>';
+    return;
+  }
+
+  // RPE trend
+  const rpeEntries = [...new Set(logs.map(l => l.date))].sort().slice(-8).map(date => {
+    const dayLogs = logs.filter(l => l.date === date);
+    const avg = dayLogs.reduce((s,l) => s + parseFloat(l.rpe||0), 0) / dayLogs.length;
+    return { date, rpe: avg.toFixed(1) };
+  });
+
+  el.innerHTML = `<div class="card">
+    <div class="ct">RPE trend</div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      ${rpeEntries.map(e => `
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+          <span style="color:var(--color-text-secondary);width:55px;">${e.date}</span>
+          <div class="pbar" style="flex:1"><div class="pfill" style="width:${parseFloat(e.rpe)*10}%;background:${parseFloat(e.rpe)>8?'var(--pts-orange)':'var(--pts-green-mid)'};"></div></div>
+          <span style="width:24px;font-weight:600;">${e.rpe}</span>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--color-text-secondary);">
+      Avg RPE: ${(rpeEntries.reduce((s,e)=>s+parseFloat(e.rpe),0)/rpeEntries.length).toFixed(1)}
+    </div>
+  </div>`;
+}
+
+function renderNotes() {
+  if (!currentAthlete) return;
+  document.getElementById('note-athlete-name').textContent = currentAthlete.name;
+  const athNotes = DB.coachNotes.filter(n => n.athlete === currentAthlete.name).slice().reverse();
+  const el = document.getElementById('note-list');
+  if (!athNotes.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:8px 0;">No notes yet.</div>';
+  } else {
+    el.innerHTML = athNotes.map(n => `
+      <div style="padding:9px 11px;background:var(--color-bg-secondary);border-radius:var(--radius-md);margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--color-text-tertiary);margin-bottom:3px;">${n.date} · Steve</div>
+        <div style="font-size:12px;">${n.note}</div>
+        ${n.action ? `<div style="font-size:11px;color:var(--pts-green);margin-top:4px;">→ ${n.action}</div>` : ''}
+      </div>`).join('');
+  }
+}
+
+// ════════════════════════════════════════════
+// ATHLETE PORTAL RENDER
+// ════════════════════════════════════════════
+
+function renderAthletePortal(week, day) {
+  if (!currentAthlete) return;
+  const exercises = DB.workouts.filter(w =>
+    w.athleteName === currentAthlete.name && w.week == week && w.day == day
+  );
+  const sessionName = exercises[0]?.sessionName || 'Session';
+  const today = new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+  const firstName = currentAthlete.name.split(' ')[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const exHTML = exercises.map(ex => {
+    const isSuperset = ex.exercise.match(/^[A-Z]\d\s·/);
+    const supersetLetter = isSuperset ? ex.exercise[0] : null;
+    const cueText = [
+      ex.sets && ex.reps ? `${ex.sets} sets × ${ex.reps} reps` : '',
+      ex.load ? `· ${ex.load}` : '',
+      ex.rest ? `· Rest ${ex.rest}` : '',
+      ex.tempo ? `· Tempo ${ex.tempo}` : ''
+    ].filter(Boolean).join(' ');
+
+    return `<div class="athex">
+      <div class="athex-name">${ex.exercise} ${supersetLetter ? `<span class="athss">Superset ${supersetLetter}</span>` : ''}</div>
+      <div class="athex-cue">${cueText}${ex.cue ? '<br>' + ex.cue : ''}</div>
+      <div class="athlog">
+        <div class="alf"><span class="all">Weight / Load</span><input class="ali" placeholder="${ex.load || 'lbs'}"/></div>
+        <div class="alf"><span class="all">Reps done</span><input class="ali" placeholder="${ex.reps || '—'}"/></div>
+        <div class="alf"><span class="all">RPE</span><input class="ali" placeholder="1–10"/></div>
+        <div class="alf"><span class="all">Note</span><input class="ali" placeholder="Notes..."/></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('ath-portal-body').innerHTML = `
+    <div class="athgreet-name">${greeting}, ${firstName}</div>
+    <div class="athgreet-sub">Week ${week} · Day ${day} · ${sessionName} — ${today}</div>
+    <div class="athcard">
+      <div class="athcard-hdr"><span class="athwk">Week ${week} · Day ${day}</span><span class="athsname">${sessionName}</span></div>
+      ${exHTML}
+    </div>
+    <div class="athrefl-card">
+      <div class="athrefl-lbl">How did the session feel?</div>
+      <textarea class="athrefl" placeholder="Energy level, soreness, mental state, anything you want Steve to know..."></textarea>
+    </div>
+    <button class="athsave" onclick="athSave(this)">Save session log</button>`;
+}
+
+// ════════════════════════════════════════════
+// SAVE FUNCTIONS
+// ════════════════════════════════════════════
+
+function saveSess(week, day) {
+  if (!currentAthlete) return;
+  const s = document.getElementById('sstat');
+  s.textContent = 'Saving...';
+  s.style.color = 'var(--pts-orange)';
+
+  // Collect all log field values
+  const inputs = document.querySelectorAll('#sess-content .li[data-ex]');
+  const reflection = document.getElementById('sess-reflection')?.value || '';
+  const today = new Date().toISOString().split('T')[0];
+
+  // Build log entries (one per exercise with data)
+  const entries = [];
+  const exerciseMap = {};
+  inputs.forEach(inp => {
+    const ex = inp.dataset.ex;
+    if (!exerciseMap[ex]) exerciseMap[ex] = {};
+    exerciseMap[ex][inp.dataset.field] = inp.value;
+  });
+
+  Object.entries(exerciseMap).forEach(([ex, fields]) => {
+    if (fields.weight || fields.reps || fields.rpe) {
+      entries.push({
+        athlete: currentAthlete.name, date: today, week, day,
+        exercise: ex, weight: fields.weight||'', repsDone: fields.reps||'',
+        rpe: fields.rpe||'', note: fields.note||'', reflection
+      });
+    }
+  });
+
+  // Add to local DB
+  DB.logs.push(...entries);
+
+  setTimeout(() => {
+    s.textContent = `Saved ✓ (${entries.length} exercises)`;
+    s.style.color = 'var(--pts-green)';
+    renderHistory();
+    renderProgress();
+    updateOverviewMetrics();
+    // TODO Phase 2: write to Google Sheets via Sheets API or Apps Script webhook
+  }, 600);
+}
+
+function athSave(btn) {
+  btn.textContent = 'Saved ✓';
+  btn.style.background = 'var(--pts-green-dark)';
+  setTimeout(() => {
+    btn.textContent = 'Save session log';
+    btn.style.background = '';
+  }, 2000);
+}
+
+function saveNote() {
+  if (!currentAthlete) return;
+  const text = document.getElementById('new-note-text').value.trim();
+  if (!text) return;
+  const today = new Date().toISOString().split('T')[0];
+  DB.coachNotes.push({ athlete: currentAthlete.name, date: today, note: text, action: '' });
+  document.getElementById('new-note-text').value = '';
+  renderNotes();
+}
+
+// ════════════════════════════════════════════
+// SHEETS CONNECT (manual URL input)
+// ════════════════════════════════════════════
+
+async function connectSheets() {
+  const url = document.getElementById('sheetsUrl').value.trim();
+  if (!url) { alert('Please paste your Google Sheets published CSV URL.'); return; }
+
+  const statusEl = document.getElementById('sheets-status');
+  statusEl.style.display = '';
+  statusEl.style.color = 'var(--pts-green)';
+  statusEl.textContent = '⟳ Connecting...';
+
+  try {
+    const data = await fetchSheet(url);
+    if (!data || !data.length) throw new Error('No data returned');
+
+    // Detect which tab was pasted based on headers
+    const headers = Object.keys(data[0]).map(h => h.toLowerCase());
+    if (headers.includes('athlete name') && headers.includes('exercise')) {
+      SHEET_URLS.workouts = url;
+      DB.workouts = data.map(r => ({
+        athleteName: r['Athlete name']||r['Athlete']||'',
+        week: parseInt(r['Week'])||1, day: parseInt(r['Day'])||1,
+        sessionName: r['Session name']||'', exercise: r['Exercise']||'',
+        sets: r['Sets']||'', reps: r['Reps']||'', load: r['Load']||'',
+        rest: r['Rest']||'', tempo: r['Tempo']||'', cue: r['Cue']||''
+      })).filter(w => w.exercise);
+      statusEl.textContent = `✓ Workouts loaded — ${DB.workouts.length} exercises`;
+    } else if (headers.includes('name') && headers.includes('block name')) {
+      SHEET_URLS.athletes = url;
+      DB.athletes = data.map(r => ({
+        name: r['Name']||'', blockName: r['Block name']||'',
+        startDate: r['Start date']||'', notes: r['Notes']||'',
+        progressionRules: r['Progression rules']||''
+      })).filter(a => a.name);
+      statusEl.textContent = `✓ Athletes loaded — ${DB.athletes.length} athletes`;
+      renderRoster();
+      updateOverviewMetrics();
+    } else if (headers.includes('weight') || headers.includes('reps done')) {
+      SHEET_URLS.logs = url;
+      DB.logs = data.map(r => ({
+        athlete: r['Athlete']||'', date: r['Date']||'',
+        week: parseInt(r['Week'])||0, day: parseInt(r['Day'])||0,
+        exercise: r['Exercise']||'', weight: r['Weight']||'',
+        repsDone: r['Reps done']||'', rpe: r['RPE']||'',
+        note: r['Note']||'', reflection: r['Workout reflection']||''
+      }));
+      statusEl.textContent = `✓ Session logs loaded — ${DB.logs.length} entries`;
+    } else if (headers.includes('action')) {
+      SHEET_URLS.notes = url;
+      DB.coachNotes = data.map(r => ({
+        athlete: r['Athlete']||'', date: r['Date']||'',
+        note: r['Note']||'', action: r['Action']||''
+      }));
+      statusEl.textContent = `✓ Coach notes loaded — ${DB.coachNotes.length} notes`;
+    } else {
+      statusEl.style.color = 'var(--pts-orange)';
+      statusEl.textContent = '⚠ Could not detect tab type. Check column headers match the setup guide.';
+    }
+  } catch(e) {
+    statusEl.style.color = 'var(--pts-orange)';
+    statusEl.textContent = `✗ Error: ${e.message}. Make sure the Sheet is published as CSV.`;
+  }
+}
+
+function showSetupGuide() {
+  alert(`Google Sheets Setup Guide:
+
+1. Open your PTS sheet
+2. Go to File → Share → Publish to web
+3. Choose each tab individually → select "CSV" format
+4. Click Publish → copy the URL
+5. Paste each tab's URL into the Connect field one at a time
+
+The dashboard auto-detects which tab you've pasted based on column headers.
+
+Tabs needed:
+• Athletes: Name, Block name, Start date, Notes
+• Workouts: Block name, Week, Day, Session name, Exercise, Sets, Reps, Load, Rest, Tempo, Cue
+• Session Logs: Athlete, Date, Week, Day, Exercise, Weight, Reps done, RPE, Note, Workout reflection
+• Coach Notes: Athlete, Date, Note, Action`);
+}
+
+// ════════════════════════════════════════════
+// SAMPLE DATA (shown before Sheets connected)
+// ════════════════════════════════════════════
+
+function renderSampleData() {
+  DB.athletes = [
+    {
+      name: 'Owen Silva',
+      blockName: 'Performance / Off-Season Strength Block',
+      startDate: '2026-03-15',
+      notes: 'Goalkeeper, 18yo, 6\'3" 200lbs. Advanced training age. Team lifts Tue/Thu.',
+      progressionRules: 'Primary lower (Trap Bar DL): +10-20 lb/week if all reps clean with good speed. DB Bench: build 50→60 lb DB over block. Rows: build 60→75 lb. Pull-up: stay BW until all 5×5 clean, then add load. Farmer Carry: build 65→80 lb DB. Power work: increase volume or maintain load only if speed and intent stay high. Week 4 = deload: reduce volume and intensity, maintain movement quality.'
+    },
+    {
+      name: 'Caroline Queenan',
+      blockName: 'In-Season Strength Maintenance',
+      startDate: '2026-03-01',
+      notes: 'Soccer athlete, in-season. Gym Mon/Fri. Practice Tue/Wed/Thu starting April.',
+      progressionRules: 'In-season: prioritize recovery. Keep RPE 6.5–7.5. Do not push loads during heavy practice weeks. Volume conservative.'
+    },
+    {
+      name: 'Ella Rust',
+      blockName: 'In-Season Strength & Recovery',
+      startDate: '2026-03-01',
+      notes: 'HS soccer center back, plays nearly every minute. Focus: maintain muscle mass, recovery, ankle dorsiflexion.',
+      progressionRules: 'In-season maintenance: hold loads steady, prioritize recovery. Flag any soreness or fatigue spikes. Do not increase volume mid-season.'
+    },
+    {
+      name: 'Giada Califano',
+      blockName: 'Youth Strength & ACL Resilience',
+      startDate: '2026-03-01',
+      notes: '12yo soccer athlete, ~110 lbs. ACL prevention focus. Foundational strength, landing mechanics, single-leg stability.',
+      progressionRules: 'Youth athlete: progress slowly. Technique > load always. Land mechanics must be clean before adding load. No grinding. Flag any knee or hip discomfort immediately.'
+    },
+    {
+      name: 'Steve Cimino',
+      blockName: 'General Strength',
+      startDate: '2026-03-01',
+      notes: 'Coach / owner. 3x/week general fitness.',
+      progressionRules: ''
+    },
+    {
+      name: 'Greg Califano',
+      blockName: 'General Strength',
+      startDate: '2026-03-01',
+      notes: '',
+      progressionRules: ''
+    },
+  ];
+  renderRoster();
+  updateOverviewMetrics();
+}
+
+// ════════════════════════════════════════════
+// VIEW / TAB / NAV
+// ════════════════════════════════════════════
+
+function setView(v) {
+  document.getElementById('coach-app').style.display = v === 'coach' ? '' : 'none';
+  document.getElementById('athlete-app').style.display = v === 'athlete' ? '' : 'none';
+  document.querySelectorAll('.view-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(v === 'coach' ? 'coach' : 'athlete'));
+  });
+  if (v === 'athlete' && currentAthlete) {
+    const { week, day } = getAthleteCurrentWeekDay(currentAthlete);
+    renderAthletePortal(week, day);
+  }
+}
+
+function showPg(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('pg-' + p).classList.add('active');
+}
+
+function showTab(t) {
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(el => el.classList.remove('active'));
+  document.getElementById('t-' + t).classList.add('active');
+  document.getElementById('tc-' + t).classList.add('active');
+}
+
+// ════════════════════════════════════════════
+// AI COACH
+// ════════════════════════════════════════════
+
+function buildAIContext() {
+  let ctx = `You are an AI strength and conditioning coach assistant for Steve Cimino at Prototype Training Systems (PTS) in Westborough, MA.
+
+Facility: barbells, dumbbells, kettlebells, bikes, rowers, boxes, turf, cold plunge, infrared sauna, Normatec boots, Theraguns.
+Programming format: exercise name block + cues/sets/reps/load/rest/tempo. Supersets use A1/A2 notation.
+Be concise, practical, specific. Under 200 words per response.
+
+Current athletes:\n`;
+  DB.athletes.forEach(a => {
+    const { week, day } = getAthleteCurrentWeekDay(a);
+    ctx += `- ${a.name}: ${a.blockName}, W${week} D${day}. ${a.notes}\n`;
+    if (a.progressionRules) {
+      ctx += `  Progression rules: ${a.progressionRules}\n`;
+    }
+  });
+  if (currentAthlete) {
+    const athLogs = DB.logs.filter(l => l.athlete === currentAthlete.name).slice(-10);
+    if (athLogs.length) {
+      ctx += `\nRecent logs for ${currentAthlete.name}:\n`;
+      athLogs.forEach(l => { ctx += `  ${l.date} — ${l.exercise}: ${l.weight} × ${l.repsDone}, RPE ${l.rpe}${l.note ? ', '+l.note : ''}\n`; });
+    }
+    const athNotes = DB.coachNotes.filter(n => n.athlete === currentAthlete.name);
+    if (athNotes.length) {
+      ctx += `\nCoach notes for ${currentAthlete.name}:\n`;
+      athNotes.forEach(n => { ctx += `  ${n.date}: ${n.note}${n.action ? ' → '+n.action : ''}\n`; });
+    }
+    if (currentAthlete.progressionRules) {
+      ctx += `\nProgression rules for ${currentAthlete.name} (apply these when suggesting next week loads):\n${currentAthlete.progressionRules}\n`;
+    }
+  }
+  return ctx;
+}
+
+function askAI(prompt) { addUser(prompt); callClaude(prompt); }
+
+function sendAI() {
+  const i = document.getElementById('aiinput');
+  const m = i.value.trim();
+  if (!m) return;
+  i.value = '';
+  addUser(m);
+  callClaude(m);
+}
+
+function addUser(t) {
+  const c = document.getElementById('aichat');
+  const d = document.createElement('div');
+  d.className = 'aimsg umsg';
+  d.innerHTML = `<div class="ubub">${t}</div>`;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+
+function addAIMsg(t) {
+  const c = document.getElementById('aichat');
+  const d = document.createElement('div');
+  d.className = 'aimsg';
+  d.innerHTML = `<div class="aiav">AI</div><div class="aibub">${t.replace(/\n/g,'<br>')}</div>`;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+  return d;
+}
+
+async function callClaude(msg) {
+  if (!ANTHROPIC_API_KEY) {
+    addAIMsg('Add your Anthropic API key to the ANTHROPIC_API_KEY variable at the top of the script to activate the AI coach.');
+    return;
+  }
+  const c = document.getElementById('aichat');
+  const ld = document.createElement('div');
+  ld.className = 'aimsg';
+  ld.innerHTML = '<div class="aiav">AI</div><div class="aibub" style="color:#999;">Thinking...</div>';
+  c.appendChild(ld);
+  c.scrollTop = c.scrollHeight;
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: buildAIContext(),
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await r.json();
+    const reply = data.content?.map(c => c.text || '').join('') || 'No response received.';
+    ld.remove();
+    addAIMsg(reply);
+  } catch(e) {
+    ld.remove();
+    addAIMsg('Connection error. Check your API key and try again.');
+  }
+}
+
+// ════════════════════════════════════════════
+// URL ROUTING
+// ════════════════════════════════════════════
+
+function handleURLRouting() {
+  const params = new URLSearchParams(window.location.search);
+  const athleteParam = params.get('athlete');
+  if (athleteParam) {
+    // Find athlete by name slug (lowercase, no spaces)
+    const match = DB.athletes.find(a =>
+      a.name.toLowerCase().replace(/\s+/g, '') === athleteParam.toLowerCase().replace(/\s+/g, '') ||
+      a.name.toLowerCase().split(' ')[0] === athleteParam.toLowerCase()
+    );
+    if (match) {
+      setView('athlete');
+      currentAthlete = match;
+      const { week, day } = getAthleteCurrentWeekDay(match);
+      renderAthletePortal(week, day);
+    }
+  }
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+
+async function init() {
+  document.getElementById('overview-date').textContent =
+    `Week of ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`;
+  await loadAllSheets();
+  handleURLRouting();
+}
+
+init();
+</script>
+</body>
+</html>
