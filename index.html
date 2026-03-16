@@ -1184,19 +1184,25 @@ async function callClaude(msg) {
 function handleURLRouting() {
   const params = new URLSearchParams(window.location.search);
   const athleteParam = params.get('athlete');
-  if (athleteParam) {
-    // Find athlete by name slug (lowercase, no spaces)
+  if (!athleteParam) return;
+  // Show athlete shell immediately so it is not blank
+  document.getElementById('coach-app').style.display = 'none';
+  document.getElementById('athlete-app').style.display = 'block';
+  // If data not loaded yet, retry every 200ms until it is
+  function tryRoute() {
     const match = DB.athletes.find(a =>
       a.name.toLowerCase().replace(/\s+/g, '') === athleteParam.toLowerCase().replace(/\s+/g, '') ||
       a.name.toLowerCase().split(' ')[0] === athleteParam.toLowerCase()
     );
-    if (match) {
-      setView('athlete');
+    if (match && DB.workouts.length > 0) {
       currentAthlete = match;
       const { week, day } = getAthleteCurrentWeekDay(match);
       renderAthletePortal(week, day);
+    } else {
+      setTimeout(tryRoute, 200);
     }
   }
+  tryRoute();
 }
 
 // ════════════════════════════════════════════
