@@ -181,6 +181,111 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .athrefl:focus { outline: none; border-color: var(--pts-green); }
 .athsave { width: 100%; padding: 14px; background: var(--pts-green); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.12s; }
 .athsave:hover { background: var(--pts-green-dark); }
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+
+  /* COACH VIEW — stack layout */
+  .layout { grid-template-columns: 1fr; }
+
+  .sidebar {
+    position: fixed;
+    top: 52px;
+    left: -260px;
+    width: 260px;
+    height: calc(100vh - 52px);
+    z-index: 200;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+  }
+  .sidebar.open { left: 0; }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 52px 0 0 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 199;
+  }
+  .sidebar-overlay.visible { display: block; }
+
+  .topbar { padding: 0 14px; }
+  .brand-main { font-size: 10px; letter-spacing: 1px; }
+  .brand-sub { display: none; }
+  .coach-id { display: none; }
+
+  /* Hamburger button */
+  .menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+  .menu-btn span {
+    display: block;
+    width: 16px;
+    height: 2px;
+    background: white;
+    position: relative;
+  }
+  .menu-btn span::before,
+  .menu-btn span::after {
+    content: '';
+    display: block;
+    width: 16px;
+    height: 2px;
+    background: white;
+    position: absolute;
+    left: 0;
+  }
+  .menu-btn span::before { top: -5px; }
+  .menu-btn span::after { top: 5px; }
+
+  .main { padding: 14px; }
+
+  /* Metric cards — 2 col on mobile */
+  .mgrid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+
+  /* Roster table — simplify columns */
+  .rrow { grid-template-columns: 1fr 70px 50px; gap: 6px; font-size: 11px; }
+  .rrow > div:nth-child(4),
+  .rrow > div:nth-child(5) { display: none; }
+  .rh > div:nth-child(4),
+  .rh > div:nth-child(5) { display: none; }
+
+  /* Athlete detail header */
+  #pg-athlete > div:first-child { flex-wrap: wrap; gap: 8px; }
+  #det-week-badge { margin-left: 0 !important; }
+
+  /* Exercise log fields — 2 col */
+  .exlog { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; }
+
+  /* Two col layout — stack */
+  .twocol { grid-template-columns: 1fr; }
+
+  /* AI chat */
+  .aichat { max-height: 240px; }
+
+  /* Sheets banner input */
+  .cbanner input { font-size: 11px; }
+
+  /* View toggle — smaller */
+  .view-btn { padding: 5px 10px; font-size: 11px; }
+}
+
+/* Very small phones */
+@media (max-width: 390px) {
+  .mgrid { grid-template-columns: 1fr 1fr; }
+  .pt { font-size: 15px; }
+  .main { padding: 10px; }
+}
 </style>
 </head>
 <body>
@@ -188,6 +293,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <!-- ===== COACH APP ===== -->
 <div id="coach-app">
   <div class="topbar">
+    <div style="display:flex;align-items:center;gap:0;">
+      <button class="menu-btn" id="menu-btn" onclick="toggleSidebar()" style="display:none;">
+        <span></span>
+      </button>
+    </div>
     <div class="topbar-brand">
       <svg width="34" height="34" viewBox="0 0 36 36">
         <circle cx="18" cy="18" r="17" fill="none" stroke="#E8572A" stroke-width="3"/>
@@ -212,8 +322,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div class="layout">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <div class="sb-section">
         <div class="sb-label">Athletes</div>
         <div class="sb-search">
@@ -627,6 +738,7 @@ function updateOverviewMetrics() {
 function selectAthlete(name) {
   currentAthlete = DB.athletes.find(a => a.name === name);
   if (!currentAthlete) return;
+  closeSidebar();
 
   const { week, day } = getAthleteCurrentWeekDay(currentAthlete);
   const pal = avatarColors(DB.athletes.indexOf(currentAthlete));
@@ -1204,6 +1316,34 @@ function handleURLRouting() {
   }
   tryRoute();
 }
+
+// ════════════════════════════════════════════
+// MOBILE SIDEBAR
+// ════════════════════════════════════════════
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen = sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('visible', !isOpen);
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('visible');
+}
+
+// Show menu button on mobile, hide on desktop
+function checkMobile() {
+  const btn = document.getElementById('menu-btn');
+  if (btn) btn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+}
+window.addEventListener('resize', checkMobile);
+checkMobile();
+
+// Close sidebar when selecting an athlete on mobile
+const origSelAth = window.selectAthlete;
 
 // ════════════════════════════════════════════
 // INIT
