@@ -473,6 +473,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 // ════════════════════════════════════════════
 const ANTHROPIC_API_KEY = '';
 
+// Google Apps Script webhook for writing session logs
+const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwsWZLPF7hR8lGDjkppeZ08_MaCfUukUPpXu1HrBqDX3cr-7qOLyvPcsM_6Z8Tnei0/exec';
+
 // Paste your published Google Sheets CSV URLs here after setup
 // Format: File → Share → Publish to web → select tab → CSV → copy URL
 const SHEET_URLS = {
@@ -996,23 +999,73 @@ function saveSess(week, day) {
   // Add to local DB
   DB.logs.push(...entries);
 
-  setTimeout(() => {
-    s.textContent = `Saved ✓ (${entries.length} exercises)`;
-    s.style.color = 'var(--pts-green)';
-    renderHistory();
-    renderProgress();
-    updateOverviewMetrics();
-    // TODO Phase 2: write to Google Sheets via Sheets API or Apps Script webhook
-  }, 600);
+  // POST to Google Apps Script webhook
+  if (WEBHOOK_URL && entries.length > 0) {
+    fetch(WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entries)
+    }).then(() => {
+      s.textContent = `Saved ✓ (${entries.length} exercises)`;
+      s.style.color = 'var(--pts-green)';
+    }).catch(() => {
+      s.textContent = 'Saved locally (sync error)';
+      s.style.color = 'var(--pts-orange)';
+    });
+  } else {
+    setTimeout(() => {
+      s.textContent = `Saved ✓ (${entries.length} exercises)`;
+      s.style.color = 'var(--pts-green)';
+    }, 600);
+  }
+  renderHistory();
+  renderProgress();
+  updateOverviewMetrics();
 }
 
 function athSave(btn) {
-  btn.textContent = 'Saved ✓';
+  if (!currentAthlete) return;
+  // Collect all log fields from athlete portal
+  const inputs = document.querySelectorAll('#ath-portal-body .ali');
+  const reflection = document.querySelector('#ath-portal-body .athrefl')?.value || '';
+  const today = new Date().toISOString().split('T')[0];
+  const { week, day } = getAthleteCurrentWeekDay(currentAthlete);
+
+  // Group inputs by exercise card
+  const cards = document.querySelectorAll('#ath-portal-body .athcard > .athex');
+  const entries = [];
+  cards.forEach(card => {
+    const exName = card.querySelector('.athex-name')?.childNodes[0]?.textContent?.trim() || '';
+    const fields = card.querySelectorAll('.ali');
+    const weight = fields[0]?.value || '';
+    const reps = fields[1]?.value || '';
+    const rpe = fields[2]?.value || '';
+    const note = fields[3]?.value || '';
+    if (weight || reps || rpe) {
+      entries.push({ athlete: currentAthlete.name, date: today, week, day, exercise: exName, weight, repsDone: reps, rpe, note, reflection });
+    }
+  });
+
+  btn.textContent = 'Saving...';
   btn.style.background = 'var(--pts-green-dark)';
-  setTimeout(() => {
-    btn.textContent = 'Save session log';
-    btn.style.background = '';
-  }, 2000);
+
+  if (WEBHOOK_URL && entries.length > 0) {
+    fetch(WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entries)
+    }).then(() => {
+      btn.textContent = 'Saved ✓';
+      setTimeout(() => { btn.textContent = 'Save session log'; btn.style.background = ''; }, 2000);
+    }).catch(() => {
+      btn.textContent = 'Saved locally';
+      setTimeout(() => { btn.textContent = 'Save session log'; btn.style.background = ''; }, 2000);
+    });
+  } else {
+    setTimeout(() => { btn.textContent = 'Save session log'; btn.style.background = ''; }, 2000);
+  }
 }
 
 function saveNote() {
