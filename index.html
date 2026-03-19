@@ -286,6 +286,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .pt { font-size: 15px; }
   .main { padding: 10px; }
 }
+
+/* ── PER-SET LOGGING (Coach view) ── */
+.exlog-sets { padding: 10px 12px; border-top: 0.5px solid var(--color-border); }
+.set-header { display: grid; grid-template-columns: 28px 1fr 1fr; gap: 6px; margin-bottom: 4px; }
+.set-row { display: grid; grid-template-columns: 28px 1fr 1fr; gap: 6px; margin-bottom: 5px; align-items: center; }
+.set-num { font-size: 10px; font-weight: 600; color: var(--pts-orange); text-transform: uppercase; padding-top: 6px; }
+.exlog-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--color-border); }
+
+/* ── PER-SET LOGGING (Athlete portal) ── */
+.athlog-sets { padding: 8px 16px 4px; background: #fafafa; border-top: 1px solid #f0f0f0; }
+.ath-set-header { display: grid; grid-template-columns: 32px 1fr 1fr; gap: 6px; margin-bottom: 4px; }
+.ath-set-row { display: grid; grid-template-columns: 32px 1fr 1fr; gap: 6px; margin-bottom: 6px; align-items: center; }
+.ath-set-num { font-size: 10px; font-weight: 700; color: var(--pts-orange); padding-top: 5px; }
+.athlog-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 16px 12px; background: #fafafa; }
+
+/* ── PROGRESS CHARTS ── */
+.prog-reflect { background: var(--pts-green-light); border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #333; line-height: 1.5; }
+.prog-reflect-date { font-size: 10px; color: var(--pts-green-dark); font-weight: 600; margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -523,12 +541,38 @@ function parseCSV(text) {
 
 async function fetchSheet(url) {
   if (!url) return null;
-  // Convert regular Sheets URL to CSV export URL if needed
-  const csvUrl = url.includes('/pub?') ? url : 
+  const csvUrl = url.includes('/pub?') ? url :
     url.replace('/edit', '/pub').replace(/\/pub$/, '/pub?output=csv') + (url.includes('?') ? '&output=csv' : '?output=csv');
   const resp = await fetch(csvUrl);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  return parseCSV(await resp.text());
+  return await resp.text();
+}
+
+function parseLogsRaw(text) {
+  // Logs sheet has no header row — parse positionally
+  // Columns: Athlete,Date,Week,Day,Exercise,Weight,Reps done,RPE,Note,Workout reflection
+  return text.trim().split('\n').map(line => {
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else { cur += line[i]; }
+    }
+    fields.push(cur.trim());
+    return {
+      athlete: fields[0] || '',
+      date: fields[1] || '',
+      week: parseInt(fields[2]) || 0,
+      day: parseInt(fields[3]) || 0,
+      exercise: fields[4] || '',
+      weight: fields[5] || '',
+      repsDone: fields[6] || '',
+      rpe: fields[7] || '',
+      note: fields[8] || '',
+      reflection: fields[9] || ''
+    };
+  }).filter(l => l.athlete && l.exercise && l.date);
 }
 
 async function loadAllSheets() {
@@ -540,12 +584,16 @@ async function loadAllSheets() {
   }
   try {
     console.log('PTS: Fetching all sheets...');
-    const [athletes, workouts, logs, notes] = await Promise.all([
+    const [athletesRaw, workoutsRaw, logsRaw, notesRaw] = await Promise.all([
       fetchSheet(urls.athletes),
       fetchSheet(urls.workouts),
       fetchSheet(urls.logs),
       fetchSheet(urls.notes)
     ]);
+    const athletes = athletesRaw ? parseCSV(athletesRaw) : null;
+    const workouts = workoutsRaw ? parseCSV(workoutsRaw) : null;
+    const logs = logsRaw ? parseLogsRaw(logsRaw) : null;
+    const notes = notesRaw ? parseCSV(notesRaw) : null;
     console.log('PTS: Athletes:', athletes?.length, '| Workouts:', workouts?.length, '| Logs:', logs?.length);
     if (workouts?.length) console.log('PTS: First workout row:', JSON.stringify(workouts[0]));
     if (athletes) DB.athletes = athletes.map(r => ({
@@ -570,18 +618,7 @@ async function loadAllSheets() {
       cue: r['Cue'] || ''
     })).filter(w => w.exercise);
 
-    if (logs) DB.logs = logs.map(r => ({
-      athlete: r['Athlete'] || '',
-      date: r['Date'] || '',
-      week: parseInt(r['Week']) || 0,
-      day: parseInt(r['Day']) || 0,
-      exercise: r['Exercise'] || '',
-      weight: r['Weight'] || '',
-      repsDone: r['Reps done'] || '',
-      rpe: r['RPE'] || '',
-      note: r['Note'] || '',
-      reflection: r['Workout reflection'] || ''
-    }));
+    if (logs) DB.logs = logs;
 
     if (notes) DB.coachNotes = notes.map(r => ({
       athlete: r['Athlete'] || '',
@@ -797,17 +834,28 @@ function renderSession(week, day) {
       ex.tempo ? `· Tempo ${ex.tempo}` : ''
     ].filter(Boolean).join(' ');
 
+    const numSets = parseInt(ex.sets) || 3;
+    const setRows = Array.from({length: numSets}, (_, i) =>
+      `<div class="set-row">
+        <span class="set-num">S${i+1}</span>
+        <input class="li" placeholder="${ex.load || 'lbs'}" data-ex="${ex.exercise}" data-field="weight" data-set="${i}"/>
+        <input class="li" placeholder="${ex.reps || '—'}" data-ex="${ex.exercise}" data-field="reps" data-set="${i}"/>
+      </div>`
+    ).join('');
+
     return `<div class="exblock">
       <div class="exname">
         ${ex.exercise}
         ${supersetLetter ? `<span class="sstag">Superset ${supersetLetter}</span>` : ''}
       </div>
       <div class="excue">${cueText}${ex.cue ? '<br>' + ex.cue : ''}</div>
-      <div class="exlog">
-        <div class="lf"><span class="ll">Weight / Load</span><input class="li" placeholder="${ex.load || '—'}" data-ex="${ex.exercise}" data-field="weight"/></div>
-        <div class="lf"><span class="ll">Reps done</span><input class="li" placeholder="${ex.reps || '—'}" data-ex="${ex.exercise}" data-field="reps"/></div>
-        <div class="lf"><span class="ll">RPE</span><input class="li" placeholder="1–10" data-ex="${ex.exercise}" data-field="rpe"/></div>
-        <div class="lf"><span class="ll">Note</span><input class="li" placeholder="Any flags..." data-ex="${ex.exercise}" data-field="note"/></div>
+      <div class="exlog-sets">
+        <div class="set-header"><span></span><span class="ll">Weight</span><span class="ll">Reps</span></div>
+        ${setRows}
+        <div class="exlog-foot">
+          <div class="lf"><span class="ll">RPE</span><input class="li" placeholder="1–10" data-ex="${ex.exercise}" data-field="rpe"/></div>
+          <div class="lf"><span class="ll">Note</span><input class="li" placeholder="Any flags..." data-ex="${ex.exercise}" data-field="note"/></div>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -827,6 +875,59 @@ function renderSession(week, day) {
         <button class="btn btn-sm btn-g" onclick="saveSess(${week}, ${day})">Save session log</button>
       </div>
     </div>`;
+}
+
+function formatSetLog(weight, reps) {
+  const ws = (weight||'').split(',').map(v=>v.trim()).filter(Boolean);
+  const rs = (reps||'').split(',').map(v=>v.trim()).filter(Boolean);
+  const len = Math.max(ws.length, rs.length);
+  if (!len) return '';
+  return ' — ' + Array.from({length: len}, (_,i) => {
+    const parts = [];
+    if (ws[i]) parts.push(ws[i]+'lb');
+    if (rs[i]) parts.push('×'+rs[i]);
+    return parts.join(' ');
+  }).join(' / ');
+}
+
+function maxWeight(weightStr) {
+  if (!weightStr) return 0;
+  return Math.max(0, ...weightStr.split(',').map(v=>parseFloat(v.trim())).filter(n=>!isNaN(n)));
+}
+
+function buildLoadChart(exerciseName) {
+  const exLogs = DB.logs.filter(l => l.athlete === currentAthlete.name && l.exercise === exerciseName && l.weight);
+  const byDate = {};
+  exLogs.forEach(l => {
+    const m = maxWeight(l.weight);
+    if (m > 0 && (!byDate[l.date] || byDate[l.date] < m)) byDate[l.date] = m;
+  });
+  const points = Object.entries(byDate).sort(([a],[b]) => a.localeCompare(b));
+  if (!points.length) return '<div style="padding:20px;text-align:center;font-size:11px;color:#999;">No weight data yet for this exercise.</div>';
+
+  const vals = points.map(([,v]) => v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 10;
+  const bufMin = minV - range*0.2, bufMax = maxV + range*0.2, bufRange = bufMax - bufMin;
+  const W=300, H=140, pL=38, pR=10, pT=8, pB=22;
+  const cW=W-pL-pR, cH=H-pT-pB;
+  const xp = i => pL + (i/Math.max(points.length-1,1))*cW;
+  const yp = v => pT + cH - ((v-bufMin)/bufRange)*cH;
+  const yTicks = Array.from({length:5},(_,i)=>bufMin+(bufRange/4)*i).reverse();
+  const pathD = points.map(([,v],i)=>`${i===0?'M':'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:160px;overflow:visible;">
+    ${yTicks.map(v=>{const yPos=yp(v);return `<line x1="${pL}" y1="${yPos.toFixed(1)}" x2="${W-pR}" y2="${yPos.toFixed(1)}" stroke="#f0f0f0" stroke-width="1"/>
+      <text x="${pL-4}" y="${(yPos+3.5).toFixed(1)}" font-size="9" fill="#bbb" text-anchor="end">${Math.round(v)}</text>`;}).join('')}
+    <path d="${pathD}" fill="none" stroke="#0c7d47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${points.map(([date,v],i)=>`<circle cx="${xp(i).toFixed(1)}" cy="${yp(v).toFixed(1)}" r="4" fill="#0c7d47"/>
+      <text x="${xp(i).toFixed(1)}" y="${H-4}" font-size="8" fill="#aaa" text-anchor="middle">${date.slice(5)}</text>`).join('')}
+  </svg>`;
+}
+
+function updateLoadChart(exerciseName) {
+  const wrap = document.getElementById('prog-chart-wrap');
+  if (wrap) wrap.innerHTML = buildLoadChart(exerciseName);
 }
 
 function renderHistory() {
@@ -854,7 +955,7 @@ function renderHistory() {
     const avgRPE = (entries.reduce((s,e) => s + (parseFloat(e.rpe)||0), 0) / entries.filter(e=>e.rpe).length).toFixed(1);
     return `<div class="hrow">
       <div style="color:var(--color-text-secondary);padding-top:1px;">${date}</div>
-      <div>${entries.map(e => `<div class="exi">${e.exercise}${e.weight ? ' — ' + e.weight : ''}${e.repsDone ? ' × ' + e.repsDone : ''}</div>`).join('')}</div>
+      <div>${entries.map(e => `<div class="exi">${e.exercise}${formatSetLog(e.weight, e.repsDone)}</div>`).join('')}</div>
       <div style="font-weight:600;">${isNaN(avgRPE) ? '—' : avgRPE}</div>
       <div><span class="bdg bdg-g">Logged</span></div>
     </div>`;
@@ -863,7 +964,7 @@ function renderHistory() {
 
 function renderProgress() {
   if (!currentAthlete) return;
-  const logs = DB.logs.filter(l => l.athlete === currentAthlete.name && l.rpe);
+  const logs = DB.logs.filter(l => l.athlete === currentAthlete.name);
   const el = document.getElementById('prog-content');
 
   if (!logs.length) {
@@ -871,27 +972,54 @@ function renderProgress() {
     return;
   }
 
+  // Exercises with weight data for dropdown
+  const weightedExercises = [...new Set(
+    logs.filter(l => l.weight && maxWeight(l.weight) > 0).map(l => l.exercise)
+  )];
+  const firstEx = weightedExercises[0] || '';
+
   // RPE trend
-  const rpeEntries = [...new Set(logs.map(l => l.date))].sort().slice(-8).map(date => {
-    const dayLogs = logs.filter(l => l.date === date);
+  const logsWithRPE = logs.filter(l => l.rpe);
+  const rpeEntries = [...new Set(logsWithRPE.map(l => l.date))].sort().slice(-8).map(date => {
+    const dayLogs = logsWithRPE.filter(l => l.date === date);
     const avg = dayLogs.reduce((s,l) => s + parseFloat(l.rpe||0), 0) / dayLogs.length;
     return { date, rpe: avg.toFixed(1) };
   });
+  const avgRPE = rpeEntries.length ? (rpeEntries.reduce((s,e)=>s+parseFloat(e.rpe),0)/rpeEntries.length).toFixed(1) : '—';
 
-  el.innerHTML = `<div class="card">
-    <div class="ct">RPE trend</div>
-    <div style="display:flex;flex-direction:column;gap:7px;">
-      ${rpeEntries.map(e => `
-        <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
-          <span style="color:var(--color-text-secondary);width:55px;">${e.date}</span>
+  // Session reflections
+  const reflDates = [...new Set(logs.filter(l=>l.reflection).map(l=>l.date))].sort().reverse().slice(0,5);
+  const reflHTML = reflDates.map(date => {
+    const entry = logs.find(l => l.date === date && l.reflection);
+    const wd = entry?.week && entry?.day ? ` — W${entry.week} D${entry.day}` : '';
+    return `<div class="prog-reflect"><div class="prog-reflect-date">${date}${wd}</div>${entry.reflection}</div>`;
+  }).join('');
+
+  el.innerHTML = `
+    ${weightedExercises.length ? `<div class="card">
+      <div class="ct">Load Progression
+        <select id="prog-ex-select" onchange="updateLoadChart(this.value)" style="font-size:12px;border:0.5px solid var(--color-border);border-radius:6px;padding:4px 8px;background:white;font-family:inherit;cursor:pointer;max-width:220px;">
+          ${weightedExercises.map(ex=>`<option value="${ex}">${ex}</option>`).join('')}
+        </select>
+      </div>
+      <div id="prog-chart-wrap">${buildLoadChart(firstEx)}</div>
+    </div>` : ''}
+
+    ${rpeEntries.length ? `<div class="card">
+      <div class="ct">RPE Trend <span style="font-size:11px;font-weight:400;color:var(--color-text-secondary);">avg ${avgRPE} · last ${rpeEntries.length} sessions</span></div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        ${rpeEntries.map(e=>`<div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+          <span style="color:var(--color-text-secondary);width:70px;">${e.date}</span>
           <div class="pbar" style="flex:1"><div class="pfill" style="width:${parseFloat(e.rpe)*10}%;background:${parseFloat(e.rpe)>8?'var(--pts-orange)':'var(--pts-green-mid)'};"></div></div>
           <span style="width:24px;font-weight:600;">${e.rpe}</span>
         </div>`).join('')}
-    </div>
-    <div style="margin-top:10px;font-size:11px;color:var(--color-text-secondary);">
-      Avg RPE: ${(rpeEntries.reduce((s,e)=>s+parseFloat(e.rpe),0)/rpeEntries.length).toFixed(1)}
-    </div>
-  </div>`;
+      </div>
+    </div>` : ''}
+
+    ${reflHTML ? `<div class="card">
+      <div class="ct">Session Reflections</div>
+      ${reflHTML}
+    </div>` : ''}`;
 }
 
 function renderNotes() {
@@ -936,14 +1064,25 @@ function renderAthletePortal(week, day) {
       ex.tempo ? `· Tempo ${ex.tempo}` : ''
     ].filter(Boolean).join(' ');
 
+    const numSets = parseInt(ex.sets) || 3;
+    const setRows = Array.from({length: numSets}, (_, i) =>
+      `<div class="ath-set-row">
+        <span class="ath-set-num">S${i+1}</span>
+        <input class="ali ath-weight" placeholder="${ex.load || 'lbs'}" data-set="${i}"/>
+        <input class="ali ath-reps" placeholder="${ex.reps || '—'}" data-set="${i}"/>
+      </div>`
+    ).join('');
+
     return `<div class="athex">
       <div class="athex-name">${ex.exercise} ${supersetLetter ? `<span class="athss">Superset ${supersetLetter}</span>` : ''}</div>
       <div class="athex-cue">${cueText}${ex.cue ? '<br>' + ex.cue : ''}</div>
-      <div class="athlog">
-        <div class="alf"><span class="all">Weight / Load</span><input class="ali" placeholder="${ex.load || 'lbs'}"/></div>
-        <div class="alf"><span class="all">Reps done</span><input class="ali" placeholder="${ex.reps || '—'}"/></div>
-        <div class="alf"><span class="all">RPE</span><input class="ali" placeholder="1–10"/></div>
-        <div class="alf"><span class="all">Note</span><input class="ali" placeholder="Notes..."/></div>
+      <div class="athlog-sets">
+        <div class="ath-set-header"><span></span><span class="all">Weight</span><span class="all">Reps</span></div>
+        ${setRows}
+      </div>
+      <div class="athlog-foot">
+        <div class="alf"><span class="all">RPE</span><input class="ali ath-rpe" placeholder="1–10"/></div>
+        <div class="alf"><span class="all">Note</span><input class="ali ath-note" placeholder="Notes..."/></div>
       </div>
     </div>`;
   }).join('');
@@ -977,20 +1116,31 @@ function saveSess(week, day) {
   const reflection = document.getElementById('sess-reflection')?.value || '';
   const today = new Date().toISOString().split('T')[0];
 
-  // Build log entries (one per exercise with data)
+  // Build log entries (one per exercise with per-set data)
   const entries = [];
   const exerciseMap = {};
   inputs.forEach(inp => {
     const ex = inp.dataset.ex;
-    if (!exerciseMap[ex]) exerciseMap[ex] = {};
-    exerciseMap[ex][inp.dataset.field] = inp.value;
+    if (!exerciseMap[ex]) exerciseMap[ex] = { weights: [], repsArr: [], rpe: '', note: '' };
+    const field = inp.dataset.field;
+    if (field === 'weight' && inp.dataset.set !== undefined) {
+      exerciseMap[ex].weights[parseInt(inp.dataset.set)] = inp.value;
+    } else if (field === 'reps' && inp.dataset.set !== undefined) {
+      exerciseMap[ex].repsArr[parseInt(inp.dataset.set)] = inp.value;
+    } else if (field === 'rpe') {
+      exerciseMap[ex].rpe = inp.value;
+    } else if (field === 'note') {
+      exerciseMap[ex].note = inp.value;
+    }
   });
 
   Object.entries(exerciseMap).forEach(([ex, fields]) => {
-    if (fields.weight || fields.reps || fields.rpe) {
+    const weight = fields.weights.join(',');
+    const repsDone = fields.repsArr.join(',');
+    if (weight.replace(/,/g,'') || repsDone.replace(/,/g,'') || fields.rpe) {
       entries.push({
         athlete: currentAthlete.name, date: today, week, day,
-        exercise: ex, weight: fields.weight||'', repsDone: fields.reps||'',
+        exercise: ex, weight, repsDone,
         rpe: fields.rpe||'', note: fields.note||'', reflection
       });
     }
@@ -1037,13 +1187,14 @@ function athSave(btn) {
   const entries = [];
   cards.forEach(card => {
     const exName = card.querySelector('.athex-name')?.childNodes[0]?.textContent?.trim() || '';
-    const fields = card.querySelectorAll('.ali');
-    const weight = fields[0]?.value || '';
-    const reps = fields[1]?.value || '';
-    const rpe = fields[2]?.value || '';
-    const note = fields[3]?.value || '';
-    if (weight || reps || rpe) {
-      entries.push({ athlete: currentAthlete.name, date: today, week, day, exercise: exName, weight, repsDone: reps, rpe, note, reflection });
+    const weightInputs = Array.from(card.querySelectorAll('.ath-weight')).map(i => i.value);
+    const repsInputs = Array.from(card.querySelectorAll('.ath-reps')).map(i => i.value);
+    const rpe = card.querySelector('.ath-rpe')?.value || '';
+    const note = card.querySelector('.ath-note')?.value || '';
+    const weight = weightInputs.join(',');
+    const repsDone = repsInputs.join(',');
+    if (weight.replace(/,/g,'') || repsDone.replace(/,/g,'') || rpe) {
+      entries.push({ athlete: currentAthlete.name, date: today, week, day, exercise: exName, weight, repsDone, rpe, note, reflection });
     }
   });
 
