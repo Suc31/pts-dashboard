@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PTS Athlete Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -181,6 +182,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .athrefl:focus { outline: none; border-color: var(--pts-green); }
 .athsave { width: 100%; padding: 14px; background: var(--pts-green); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.12s; }
 .athsave:hover { background: var(--pts-green-dark); }
+.athnav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; background: white; border: 1px solid #e8e8e8; border-radius: 10px; padding: 10px 14px; }
+.athnav-btn { background: none; border: 1px solid #e0e0e0; border-radius: 6px; width: 32px; height: 32px; font-size: 18px; cursor: pointer; color: #111; display: flex; align-items: center; justify-content: center; transition: background 0.1s; }
+.athnav-btn:hover:not(:disabled) { background: var(--pts-green-light); border-color: var(--pts-green); }
+.athnav-btn:disabled { opacity: 0.25; cursor: default; }
+.athnav-label { text-align: center; }
+.athnav-wkday { font-size: 13px; font-weight: 700; color: #111; }
+.athnav-sname { font-size: 11px; color: #666; margin-top: 1px; }
+.athnav-today { font-size: 10px; font-weight: 600; background: var(--pts-orange); color: white; padding: 2px 7px; border-radius: 10px; margin-top: 3px; display: inline-block; }
 
 /* ── MOBILE RESPONSIVE ── */
 @media (max-width: 768px) {
@@ -301,7 +310,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ath-set-num { font-size: 10px; font-weight: 700; color: var(--pts-orange); padding-top: 5px; }
 .athlog-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 16px 12px; background: #fafafa; }
 
-/* ── PROGRESS CHARTS ── */
+/* PROGRESS TAB */
+.prog-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.prog-chip { display: flex; align-items: center; justify-content: center; width: 52px; height: 34px; border-radius: 7px; font-size: 10px; font-weight: 600; cursor: default; }
+.prog-chip.done { background: var(--pts-green-light); color: var(--pts-green-dark); border: 1.5px solid #b6ddc8; }
+.prog-chip.today { background: var(--pts-orange-light); color: var(--pts-orange); border: 1.5px solid var(--pts-orange); }
+.prog-chip.pending { background: #f4f4f4; color: #bbb; border: 1.5px solid #e8e8e8; }
+.prog-chart-wrap { position: relative; height: 180px; margin-top: 10px; }
 .prog-reflect { background: var(--pts-green-light); border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #333; line-height: 1.5; }
 .prog-reflect-date { font-size: 10px; color: var(--pts-green-dark); font-weight: 600; margin-bottom: 4px; }
 </style>
@@ -399,8 +414,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <div class="pt" id="det-name">Select an athlete</div>
             <div class="ps" id="det-meta"></div>
           </div>
-          <div style="margin-left:auto;display:flex;gap:7px;">
+          <div style="margin-left:auto;display:flex;gap:7px;align-items:center;">
             <div id="det-week-badge" style="display:none;"></div>
+            <button class="btn btn-sm" id="refresh-btn" onclick="refreshLogs()" title="Refresh session data" style="background:#f5f5f5;color:#555;border:1px solid #ddd;">↻ Refresh</button>
             <button class="btn btn-sm btn-o" onclick="showPg('ai')">AI progression ↗</button>
           </div>
         </div>
@@ -513,6 +529,8 @@ let DB = {
   coachNotes: []    // [{athlete, date, note, action}]
 };
 let currentAthlete = null;
+let athCurrentWeek = 1;
+let athCurrentDay = 1;
 let sheetsConnected = false;
 
 // ════════════════════════════════════════════
@@ -639,6 +657,32 @@ async function loadAllSheets() {
 }
 
 // ════════════════════════════════════════════
+// LIVE LOGS — fetch fresh from Apps Script (no CSV cache)
+// ════════════════════════════════════════════
+
+async function refreshLogs() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.textContent = '↻ Loading…'; btn.disabled = true; }
+  await loadLiveLogs();
+  if (btn) { btn.textContent = '↻ Refresh'; btn.disabled = false; }
+}
+
+async function loadLiveLogs() {
+  try {
+    const resp = await fetch(WEBHOOK_URL + '?action=getLogs');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.status === 'ok' && Array.isArray(data.logs)) {
+      DB.logs = data.logs.filter(r => r.athlete && r.athlete !== 'undefined').map(r => ({
+        ...r,
+        date: (() => { const d = new Date(r.date); return isNaN(d) ? r.date : d.toLocaleDateString('en-CA'); })()
+      }));
+      if (currentAthlete) { renderHistory(); renderProgress(); }
+    }
+  } catch(err) { console.warn('Live logs fetch failed:', err); }
+}
+
+// ════════════════════════════════════════════
 // DAY CALCULATION — derived from Workouts tab
 // ════════════════════════════════════════════
 
@@ -662,15 +706,10 @@ function getAthleteCurrentWeekDay(athlete) {
   const msPerDay = 86400000;
   const daysElapsed = Math.max(0, Math.floor((today - startDate) / msPerDay));
 
-  // Map elapsed days to program days (skip weekends only if needed — for now linear)
-  // totalDays per week = training frequency derived from workouts
-  const weeksElapsed = Math.floor(daysElapsed / 7);
-  const remainingDays = daysElapsed % 7;
-
-  // Determine how many training sessions fit in a week
-  // We space training days evenly across the week
+  // Map elapsed days to program days
+  // Use Math.ceil so a 4-day/week program spaces sessions ~every 2 calendar days
   const daysPerWeek = totalDays <= 4 ? totalDays : 4;
-  const sessionInterval = Math.floor(7 / daysPerWeek);
+  const sessionInterval = Math.ceil(7 / daysPerWeek);
   const sessionsElapsed = Math.floor(daysElapsed / sessionInterval);
 
   const week = Math.floor(sessionsElapsed / totalDays) + 1;
@@ -842,7 +881,6 @@ function renderSession(week, day) {
         <input class="li" placeholder="${ex.reps || '—'}" data-ex="${ex.exercise}" data-field="reps" data-set="${i}"/>
       </div>`
     ).join('');
-
     return `<div class="exblock">
       <div class="exname">
         ${ex.exercise}
@@ -890,46 +928,6 @@ function formatSetLog(weight, reps) {
   }).join(' / ');
 }
 
-function maxWeight(weightStr) {
-  if (!weightStr) return 0;
-  return Math.max(0, ...weightStr.split(',').map(v=>parseFloat(v.trim())).filter(n=>!isNaN(n)));
-}
-
-function buildLoadChart(exerciseName) {
-  const exLogs = DB.logs.filter(l => l.athlete === currentAthlete.name && l.exercise === exerciseName && l.weight);
-  const byDate = {};
-  exLogs.forEach(l => {
-    const m = maxWeight(l.weight);
-    if (m > 0 && (!byDate[l.date] || byDate[l.date] < m)) byDate[l.date] = m;
-  });
-  const points = Object.entries(byDate).sort(([a],[b]) => a.localeCompare(b));
-  if (!points.length) return '<div style="padding:20px;text-align:center;font-size:11px;color:#999;">No weight data yet for this exercise.</div>';
-
-  const vals = points.map(([,v]) => v);
-  const minV = Math.min(...vals), maxV = Math.max(...vals);
-  const range = maxV - minV || 10;
-  const bufMin = minV - range*0.2, bufMax = maxV + range*0.2, bufRange = bufMax - bufMin;
-  const W=300, H=140, pL=38, pR=10, pT=8, pB=22;
-  const cW=W-pL-pR, cH=H-pT-pB;
-  const xp = i => pL + (i/Math.max(points.length-1,1))*cW;
-  const yp = v => pT + cH - ((v-bufMin)/bufRange)*cH;
-  const yTicks = Array.from({length:5},(_,i)=>bufMin+(bufRange/4)*i).reverse();
-  const pathD = points.map(([,v],i)=>`${i===0?'M':'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
-
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:160px;overflow:visible;">
-    ${yTicks.map(v=>{const yPos=yp(v);return `<line x1="${pL}" y1="${yPos.toFixed(1)}" x2="${W-pR}" y2="${yPos.toFixed(1)}" stroke="#f0f0f0" stroke-width="1"/>
-      <text x="${pL-4}" y="${(yPos+3.5).toFixed(1)}" font-size="9" fill="#bbb" text-anchor="end">${Math.round(v)}</text>`;}).join('')}
-    <path d="${pathD}" fill="none" stroke="#0c7d47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    ${points.map(([date,v],i)=>`<circle cx="${xp(i).toFixed(1)}" cy="${yp(v).toFixed(1)}" r="4" fill="#0c7d47"/>
-      <text x="${xp(i).toFixed(1)}" y="${H-4}" font-size="8" fill="#aaa" text-anchor="middle">${date.slice(5)}</text>`).join('')}
-  </svg>`;
-}
-
-function updateLoadChart(exerciseName) {
-  const wrap = document.getElementById('prog-chart-wrap');
-  if (wrap) wrap.innerHTML = buildLoadChart(exerciseName);
-}
-
 function renderHistory() {
   if (!currentAthlete) return;
   const athLogs = DB.logs
@@ -962,64 +960,160 @@ function renderHistory() {
   }).join('');
 }
 
+let _progChart = null;
+
 function renderProgress() {
   if (!currentAthlete) return;
-  const logs = DB.logs.filter(l => l.athlete === currentAthlete.name);
   const el = document.getElementById('prog-content');
+  const allLogs = DB.logs.filter(l => l.athlete === currentAthlete.name);
+  const ratedLogs = allLogs.filter(l => l.rpe);
 
-  if (!logs.length) {
-    el.innerHTML = '<div class="state-msg">No session data yet — progress charts will appear after first few sessions.</div>';
-    return;
-  }
+  // ── Card 1: Session Completion Grid ──────────────────────────────
+  const sessions = (() => {
+    const seen = new Set();
+    return DB.workouts
+      .filter(w => w.athleteName === currentAthlete.name)
+      .filter(w => { const k = w.week+'-'+w.day; if(seen.has(k)) return false; seen.add(k); return true; })
+      .sort((a,b) => a.week !== b.week ? a.week - b.week : a.day - b.day);
+  })();
 
-  // Exercises with weight data for dropdown
-  const weightedExercises = [...new Set(
-    logs.filter(l => l.weight && maxWeight(l.weight) > 0).map(l => l.exercise)
-  )];
-  const firstEx = weightedExercises[0] || '';
+  const loggedKeys = new Set(allLogs.map(l => l.week+'-'+l.day));
+  const { week: todayWeek, day: todayDay } = getAthleteCurrentWeekDay(currentAthlete);
+  const todayKey = todayWeek + '-' + todayDay;
 
-  // RPE trend
-  const logsWithRPE = logs.filter(l => l.rpe);
-  const rpeEntries = [...new Set(logsWithRPE.map(l => l.date))].sort().slice(-8).map(date => {
-    const dayLogs = logsWithRPE.filter(l => l.date === date);
-    const avg = dayLogs.reduce((s,l) => s + parseFloat(l.rpe||0), 0) / dayLogs.length;
-    return { date, rpe: avg.toFixed(1) };
-  });
-  const avgRPE = rpeEntries.length ? (rpeEntries.reduce((s,e)=>s+parseFloat(e.rpe),0)/rpeEntries.length).toFixed(1) : '—';
-
-  // Session reflections
-  const reflDates = [...new Set(logs.filter(l=>l.reflection).map(l=>l.date))].sort().reverse().slice(0,5);
-  const reflHTML = reflDates.map(date => {
-    const entry = logs.find(l => l.date === date && l.reflection);
-    const wd = entry?.week && entry?.day ? ` — W${entry.week} D${entry.day}` : '';
-    return `<div class="prog-reflect"><div class="prog-reflect-date">${date}${wd}</div>${entry.reflection}</div>`;
+  const gridChips = sessions.map(s => {
+    const k = s.week+'-'+s.day;
+    const cls = loggedKeys.has(k) ? 'done' : (k === todayKey ? 'today' : 'pending');
+    const label = loggedKeys.has(k) ? '✓' : (k === todayKey ? 'TODAY' : '');
+    return `<div class="prog-chip ${cls}" title="Week ${s.week} Day ${s.day} — ${s.sessionName}">
+      <div style="text-align:center;line-height:1.2;">
+        <div style="font-size:9px;opacity:0.7;">W${s.week}D${s.day}</div>
+        <div>${label}</div>
+      </div>
+    </div>`;
   }).join('');
 
-  el.innerHTML = `
-    ${weightedExercises.length ? `<div class="card">
-      <div class="ct">Load Progression
-        <select id="prog-ex-select" onchange="updateLoadChart(this.value)" style="font-size:12px;border:0.5px solid var(--color-border);border-radius:6px;padding:4px 8px;background:white;font-family:inherit;cursor:pointer;max-width:220px;">
-          ${weightedExercises.map(ex=>`<option value="${ex}">${ex}</option>`).join('')}
+  const completedCount = loggedKeys.size;
+  const totalCount = sessions.length;
+
+  // ── Card 2: Load Progression ──────────────────────────────────────
+  const exercisesWithLoad = [...new Set(allLogs.filter(l => l.weight && parseFloat(l.weight)).map(l => l.exercise))].sort();
+  let loadCardHTML = '';
+  if (exercisesWithLoad.length) {
+    const defaultEx = exercisesWithLoad[0];
+    loadCardHTML = `<div class="card" style="margin-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div class="ct" style="margin:0;">Load Progression</div>
+        <select id="prog-ex-select" onchange="renderProgressChart()" style="font-size:11px;border:1px solid #e0e0e0;border-radius:6px;padding:3px 6px;color:#333;background:white;">
+          ${exercisesWithLoad.map(ex => `<option value="${ex}">${ex}</option>`).join('')}
         </select>
       </div>
-      <div id="prog-chart-wrap">${buildLoadChart(firstEx)}</div>
-    </div>` : ''}
+      <div class="prog-chart-wrap"><canvas id="prog-chart"></canvas></div>
+    </div>`;
+  } else {
+    loadCardHTML = `<div class="card" style="margin-top:14px;">
+      <div class="ct">Load Progression</div>
+      <div style="font-size:12px;color:var(--color-text-tertiary);padding:12px 0;">Charts will populate once ${currentAthlete.name.split(' ')[0]} logs weight in a session.</div>
+    </div>`;
+  }
 
-    ${rpeEntries.length ? `<div class="card">
-      <div class="ct">RPE Trend <span style="font-size:11px;font-weight:400;color:var(--color-text-secondary);">avg ${avgRPE} · last ${rpeEntries.length} sessions</span></div>
-      <div style="display:flex;flex-direction:column;gap:7px;">
-        ${rpeEntries.map(e=>`<div style="display:flex;align-items:center;gap:8px;font-size:11px;">
-          <span style="color:var(--color-text-secondary);width:70px;">${e.date}</span>
-          <div class="pbar" style="flex:1"><div class="pfill" style="width:${parseFloat(e.rpe)*10}%;background:${parseFloat(e.rpe)>8?'var(--pts-orange)':'var(--pts-green-mid)'};"></div></div>
-          <span style="width:24px;font-weight:600;">${e.rpe}</span>
-        </div>`).join('')}
+  // ── Card 3: RPE Trend ─────────────────────────────────────────────
+  let rpeCardHTML = '';
+  if (ratedLogs.length) {
+    const rpeEntries = [...new Set(ratedLogs.map(l => l.date))].sort().slice(-10).map(date => {
+      const dayLogs = ratedLogs.filter(l => l.date === date);
+      const avg = dayLogs.reduce((s,l) => s + parseFloat(l.rpe||0), 0) / dayLogs.length;
+      return { date, rpe: avg.toFixed(1) };
+    });
+    const avgAll = (rpeEntries.reduce((s,e)=>s+parseFloat(e.rpe),0)/rpeEntries.length).toFixed(1);
+    rpeCardHTML = `<div class="card" style="margin-top:14px;">
+      <div class="ct">RPE Trend <span style="font-weight:400;font-size:10px;color:var(--color-text-secondary);">avg ${avgAll} · last ${rpeEntries.length} sessions</span></div>
+      <div style="display:flex;flex-direction:column;gap:7px;margin-top:8px;">
+        ${rpeEntries.map(e => `
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+            <span style="color:var(--color-text-secondary);width:72px;flex-shrink:0;">${e.date}</span>
+            <div class="pbar" style="flex:1"><div class="pfill" style="width:${parseFloat(e.rpe)*10}%;background:${parseFloat(e.rpe)>8?'var(--pts-orange)':'var(--pts-green-mid)'};"></div></div>
+            <span style="width:24px;font-weight:600;text-align:right;">${e.rpe}</span>
+          </div>`).join('')}
       </div>
-    </div>` : ''}
+    </div>`;
+  } else {
+    rpeCardHTML = `<div class="card" style="margin-top:14px;">
+      <div class="ct">RPE Trend</div>
+      <div style="font-size:12px;color:var(--color-text-tertiary);padding:12px 0;">RPE chart will appear after first logged session.</div>
+    </div>`;
+  }
 
-    ${reflHTML ? `<div class="card">
+  // ── Card 4: Workout Reflections ───────────────────────────────────
+  const reflections = allLogs.filter(l => l.reflection && l.reflection.trim())
+    .sort((a,b) => new Date(b.date) - new Date(a.date))
+    .reduce((acc, l) => { if (!acc.find(x => x.date === l.date)) acc.push(l); return acc; }, [])
+    .slice(0, 5);
+
+  let reflectHTML = '';
+  if (reflections.length) {
+    reflectHTML = `<div class="card" style="margin-top:14px;">
       <div class="ct">Session Reflections</div>
-      ${reflHTML}
-    </div>` : ''}`;
+      ${reflections.map(l => `<div class="prog-reflect"><div class="prog-reflect-date">${l.date} — W${l.week} D${l.day}</div>${l.reflection}</div>`).join('')}
+    </div>`;
+  }
+
+  // ── Assemble ──────────────────────────────────────────────────────
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="ct" style="margin:0;">Block Progress</div>
+        <span style="font-size:11px;color:var(--color-text-secondary);">${completedCount} / ${totalCount} sessions logged</span>
+      </div>
+      ${sessions.length ? `<div class="prog-grid">${gridChips}</div>` : '<div style="font-size:12px;color:var(--color-text-tertiary);padding:8px 0;">No program loaded yet.</div>'}
+    </div>
+    ${loadCardHTML}
+    ${rpeCardHTML}
+    ${reflectHTML}
+  `;
+
+  if (exercisesWithLoad.length) renderProgressChart();
+}
+
+function renderProgressChart() {
+  const select = document.getElementById('prog-ex-select');
+  if (!select || !currentAthlete) return;
+  const ex = select.value;
+  const entries = DB.logs
+    .filter(l => l.athlete === currentAthlete.name && l.exercise === ex && l.weight && parseFloat(l.weight))
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  const labels = entries.map(l => l.date);
+  const data = entries.map(l => parseFloat(l.weight));
+
+  if (_progChart) { _progChart.destroy(); _progChart = null; }
+  const canvas = document.getElementById('prog-chart');
+  if (!canvas) return;
+  _progChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: ex,
+        data,
+        borderColor: '#0c7d47',
+        backgroundColor: 'rgba(12,125,71,0.08)',
+        tension: 0.3,
+        fill: true,
+        pointBackgroundColor: '#0c7d47',
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#f0f0f0' } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
 }
 
 function renderNotes() {
@@ -1043,8 +1137,28 @@ function renderNotes() {
 // ATHLETE PORTAL RENDER
 // ════════════════════════════════════════════
 
+function getAthleteSessions(athlete) {
+  const seen = new Set();
+  return DB.workouts
+    .filter(w => w.athleteName === athlete.name)
+    .filter(w => { const k = w.week + '-' + w.day; if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => a.week !== b.week ? a.week - b.week : a.day - b.day);
+}
+
+function athNavSession(dir) {
+  if (!currentAthlete) return;
+  const sessions = getAthleteSessions(currentAthlete);
+  const idx = sessions.findIndex(s => s.week == athCurrentWeek && s.day == athCurrentDay);
+  const newIdx = idx + dir;
+  if (newIdx >= 0 && newIdx < sessions.length) {
+    renderAthletePortal(sessions[newIdx].week, sessions[newIdx].day);
+  }
+}
+
 function renderAthletePortal(week, day) {
   if (!currentAthlete) return;
+  athCurrentWeek = week;
+  athCurrentDay = day;
   const exercises = DB.workouts.filter(w =>
     w.athleteName === currentAthlete.name && w.week == week && w.day == day
   );
@@ -1053,6 +1167,23 @@ function renderAthletePortal(week, day) {
   const firstName = currentAthlete.name.split(' ')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  // Build session nav
+  const sessions = getAthleteSessions(currentAthlete);
+  const sessionIdx = sessions.findIndex(s => s.week == week && s.day == day);
+  const isFirst = sessionIdx <= 0;
+  const isLast = sessionIdx >= sessions.length - 1;
+  const { week: calcWeek, day: calcDay } = getAthleteCurrentWeekDay(currentAthlete);
+  const isToday = week == calcWeek && day == calcDay;
+  const navHTML = `<div class="athnav">
+    <button class="athnav-btn" onclick="athNavSession(-1)" ${isFirst ? 'disabled' : ''}>&#8249;</button>
+    <div class="athnav-label">
+      <div class="athnav-wkday">Week ${week} &middot; Day ${day}</div>
+      <div class="athnav-sname">${sessionName}</div>
+      ${isToday ? '<div class="athnav-today">TODAY</div>' : ''}
+    </div>
+    <button class="athnav-btn" onclick="athNavSession(1)" ${isLast ? 'disabled' : ''}>&#8250;</button>
+  </div>`;
 
   const exHTML = exercises.map(ex => {
     const isSuperset = ex.exercise.match(/^[A-Z]\d\s·/);
@@ -1072,7 +1203,6 @@ function renderAthletePortal(week, day) {
         <input class="ali ath-reps" placeholder="${ex.reps || '—'}" data-set="${i}"/>
       </div>`
     ).join('');
-
     return `<div class="athex">
       <div class="athex-name">${ex.exercise} ${supersetLetter ? `<span class="athss">Superset ${supersetLetter}</span>` : ''}</div>
       <div class="athex-cue">${cueText}${ex.cue ? '<br>' + ex.cue : ''}</div>
@@ -1088,6 +1218,7 @@ function renderAthletePortal(week, day) {
   }).join('');
 
   document.getElementById('ath-portal-body').innerHTML = `
+    ${navHTML}
     <div class="athgreet-name">${greeting}, ${firstName}</div>
     <div class="athgreet-sub">Week ${week} · Day ${day} · ${sessionName} — ${today}</div>
     <div class="athcard">
@@ -1114,9 +1245,9 @@ function saveSess(week, day) {
   // Collect all log field values
   const inputs = document.querySelectorAll('#sess-content .li[data-ex]');
   const reflection = document.getElementById('sess-reflection')?.value || '';
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
 
-  // Build log entries (one per exercise with per-set data)
+  // Build log entries — per-set weights/reps joined as comma strings
   const entries = [];
   const exerciseMap = {};
   inputs.forEach(inp => {
@@ -1127,11 +1258,8 @@ function saveSess(week, day) {
       exerciseMap[ex].weights[parseInt(inp.dataset.set)] = inp.value;
     } else if (field === 'reps' && inp.dataset.set !== undefined) {
       exerciseMap[ex].repsArr[parseInt(inp.dataset.set)] = inp.value;
-    } else if (field === 'rpe') {
-      exerciseMap[ex].rpe = inp.value;
-    } else if (field === 'note') {
-      exerciseMap[ex].note = inp.value;
-    }
+    } else if (field === 'rpe') { exerciseMap[ex].rpe = inp.value; }
+    else if (field === 'note') { exerciseMap[ex].note = inp.value; }
   });
 
   Object.entries(exerciseMap).forEach(([ex, fields]) => {
@@ -1179,8 +1307,8 @@ function athSave(btn) {
   // Collect all log fields from athlete portal
   const inputs = document.querySelectorAll('#ath-portal-body .ali');
   const reflection = document.querySelector('#ath-portal-body .athrefl')?.value || '';
-  const today = new Date().toISOString().split('T')[0];
-  const { week, day } = getAthleteCurrentWeekDay(currentAthlete);
+  const today = new Date().toLocaleDateString('en-CA');
+  const week = athCurrentWeek, day = athCurrentDay;
 
   // Group inputs by exercise card
   const cards = document.querySelectorAll('#ath-portal-body .athcard > .athex');
@@ -1223,7 +1351,7 @@ function saveNote() {
   if (!currentAthlete) return;
   const text = document.getElementById('new-note-text').value.trim();
   if (!text) return;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
   DB.coachNotes.push({ athlete: currentAthlete.name, date: today, note: text, action: '' });
   document.getElementById('new-note-text').value = '';
   renderNotes();
@@ -1557,6 +1685,7 @@ async function init() {
   document.getElementById('overview-date').textContent =
     `Week of ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`;
   await loadAllSheets();
+  loadLiveLogs(); // fetch fresh logs bypassing CSV cache
   // handleURLRouting is called inside loadAllSheets after data is ready
 }
 
