@@ -43,9 +43,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .brand-words { line-height: 1.2; }
 .brand-main { font-size: 12px; font-weight: 600; color: white; letter-spacing: 1.6px; text-transform: uppercase; }
 .brand-sub { font-size: 9px; color: var(--pts-green-mid); letter-spacing: 1.2px; text-transform: uppercase; }
-.view-toggle { display: flex; gap: 3px; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 3px; }
-.view-btn { padding: 5px 14px; border: none; background: none; border-radius: 4px; font-size: 12px; cursor: pointer; color: rgba(255,255,255,0.4); font-family: inherit; transition: all 0.15s; }
-.view-btn.active { background: var(--pts-green); color: white; font-weight: 600; }
 .coach-id { font-size: 10px; color: rgba(255,255,255,0.28); letter-spacing: 1px; text-transform: uppercase; }
 
 /* LAYOUT */
@@ -291,8 +288,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   /* Sheets banner input */
   .cbanner input { font-size: 11px; }
 
-  /* View toggle — smaller */
-  .view-btn { padding: 5px 10px; font-size: 11px; }
 }
 
 /* Very small phones */
@@ -328,6 +323,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </style>
 </head>
 <body>
+
+<!-- ===== AUTH SCREEN ===== -->
+<div id="auth-screen" style="display:none;">
+  <div style="min-height:100vh;background:#000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="width:100%;max-width:340px;text-align:center;">
+      <svg width="52" height="52" viewBox="0 0 36 36" style="margin-bottom:20px;">
+        <circle cx="18" cy="18" r="17" fill="none" stroke="#E8572A" stroke-width="3"/>
+        <circle cx="18" cy="18" r="13" fill="white"/>
+        <path d="M18 6 L21 16 L18 13 L15 16 Z" fill="#0c7d47"/>
+        <path d="M18 30 L15 20 L18 23 L21 20 Z" fill="#0c7d47"/>
+        <path d="M6 18 L16 15 L13 18 L16 21 Z" fill="#0c7d47"/>
+        <path d="M30 18 L20 21 L23 18 L20 15 Z" fill="#0c7d47"/>
+        <circle cx="18" cy="18" r="3" fill="#0c7d47"/>
+      </svg>
+      <div style="font-size:11px;font-weight:600;color:white;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Prototype Training Systems</div>
+      <div style="font-size:10px;color:#2ab070;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:36px;">Coach Dashboard</div>
+      <input id="pin-input" type="password" placeholder="Enter access code"
+        style="width:100%;padding:14px 16px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:16px;font-family:inherit;text-align:center;letter-spacing:4px;outline:none;margin-bottom:12px;"
+        onkeydown="if(event.key==='Enter')checkPin()" />
+      <button onclick="checkPin()"
+        style="width:100%;padding:14px;background:#0c7d47;border:none;border-radius:8px;color:white;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;letter-spacing:0.5px;">
+        Sign in
+      </button>
+      <div id="pin-error" style="color:#e8572a;font-size:12px;margin-top:12px;display:none;">Incorrect access code. Try again.</div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== COACH APP ===== -->
 <div id="coach-app">
@@ -507,6 +529,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 // CONFIG — add your keys here
 // ════════════════════════════════════════════
 const ANTHROPIC_API_KEY = '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';
+
+// ── Coach access code ──────────────────────
+// Change this to whatever you want your sign-in code to be
+const COACH_PIN = 'PTS2026';
+
+// ── Athlete private tokens ─────────────────
+// Each athlete gets a unique unguessable link: ?token=<value>
+// Share their link once — they bookmark it. Change a token to revoke access.
+const ATHLETE_TOKENS = {
+  'pts-os9k2m4x': 'Owen Silva',
+  'pts-cq7r3p1n': 'Caroline Queenan',
+  'pts-jd4w8v2q': 'Jason Didner',
+  'pts-km5t6b9r': 'Kim Mollo',
+  'pts-al2n7c5f': 'Alanna Laird',
+  'pts-dd8h1x3p': 'Derek Daniello',
+  'pts-sc6y4m7k': 'Steve Cimino',
+  'pts-gc3q9n1w': 'Greg Califano',
+};
 
 // Google Apps Script webhook for writing session logs
 const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwsWZLPF7hR8lGDjkppeZ08_MaCfUukUPpXu1HrBqDX3cr-7qOLyvPcsM_6Z8Tnei0/exec';
@@ -1499,17 +1539,6 @@ function renderSampleData() {
 // VIEW / TAB / NAV
 // ════════════════════════════════════════════
 
-function setView(v) {
-  document.getElementById('coach-app').style.display = v === 'coach' ? '' : 'none';
-  document.getElementById('athlete-app').style.display = v === 'athlete' ? 'block' : 'none';
-  document.querySelectorAll('.view-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.toLowerCase().includes(v === 'coach' ? 'coach' : 'athlete'));
-  });
-  if (v === 'athlete' && currentAthlete) {
-    const { week, day } = getAthleteCurrentWeekDay(currentAthlete);
-    renderAthletePortal(week, day);
-  }
-}
 
 function showPg(p) {
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
@@ -1626,28 +1655,89 @@ async function callClaude(msg) {
 // URL ROUTING
 // ════════════════════════════════════════════
 
+// ════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════
+
+function checkPin() {
+  const val = document.getElementById('pin-input').value.trim();
+  if (val === COACH_PIN) {
+    localStorage.setItem('pts-coach-auth', Date.now());
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('coach-app').style.display = '';
+  } else {
+    document.getElementById('pin-error').style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+function isCoachAuthed() {
+  const ts = localStorage.getItem('pts-coach-auth');
+  if (!ts) return false;
+  const days30 = 30 * 24 * 60 * 60 * 1000;
+  return (Date.now() - parseInt(ts)) < days30;
+}
+
 function handleURLRouting() {
   const params = new URLSearchParams(window.location.search);
-  const athleteParam = params.get('athlete');
-  if (!athleteParam) return;
-  // Show athlete shell immediately so it is not blank
-  document.getElementById('coach-app').style.display = 'none';
-  document.getElementById('athlete-app').style.display = 'block';
-  // If data not loaded yet, retry every 200ms until it is
-  function tryRoute() {
-    const match = DB.athletes.find(a =>
-      a.name.toLowerCase().replace(/\s+/g, '') === athleteParam.toLowerCase().replace(/\s+/g, '') ||
-      a.name.toLowerCase().split(' ')[0] === athleteParam.toLowerCase()
-    );
-    if (match && DB.workouts.length > 0) {
-      currentAthlete = match;
-      const { week, day } = getAthleteCurrentWeekDay(match);
-      renderAthletePortal(week, day);
-    } else {
-      setTimeout(tryRoute, 200);
+  const token = params.get('token');
+  const legacyAthlete = params.get('athlete'); // backward compat
+
+  // ── Athlete via token ──
+  if (token) {
+    const athleteName = ATHLETE_TOKENS[token];
+    if (!athleteName) {
+      // Invalid token — show a simple error
+      document.getElementById('coach-app').style.display = 'none';
+      document.getElementById('athlete-app').style.display = 'block';
+      document.getElementById('ath-portal-body').innerHTML =
+        '<div style="padding:40px 20px;text-align:center;color:#888;">Link not recognised. Please use the link your coach sent you.</div>';
+      return;
     }
+    document.getElementById('coach-app').style.display = 'none';
+    document.getElementById('athlete-app').style.display = 'block';
+    function tryTokenRoute() {
+      const match = DB.athletes.find(a => a.name === athleteName);
+      if (match && DB.workouts.length > 0) {
+        currentAthlete = match;
+        const { week, day } = getAthleteCurrentWeekDay(match);
+        renderAthletePortal(week, day);
+      } else {
+        setTimeout(tryTokenRoute, 200);
+      }
+    }
+    tryTokenRoute();
+    return;
   }
-  tryRoute();
+
+  // ── Legacy ?athlete= param (backward compat) ──
+  if (legacyAthlete) {
+    document.getElementById('coach-app').style.display = 'none';
+    document.getElementById('athlete-app').style.display = 'block';
+    function tryLegacyRoute() {
+      const match = DB.athletes.find(a =>
+        a.name.toLowerCase().replace(/\s+/g, '') === legacyAthlete.toLowerCase().replace(/\s+/g, '') ||
+        a.name.toLowerCase().split(' ')[0] === legacyAthlete.toLowerCase()
+      );
+      if (match && DB.workouts.length > 0) {
+        currentAthlete = match;
+        const { week, day } = getAthleteCurrentWeekDay(match);
+        renderAthletePortal(week, day);
+      } else {
+        setTimeout(tryLegacyRoute, 200);
+      }
+    }
+    tryLegacyRoute();
+    return;
+  }
+
+  // ── Coach view — require PIN ──
+  if (!isCoachAuthed()) {
+    document.getElementById('coach-app').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'block';
+    setTimeout(() => document.getElementById('pin-input')?.focus(), 100);
+  }
 }
 
 // ════════════════════════════════════════════
